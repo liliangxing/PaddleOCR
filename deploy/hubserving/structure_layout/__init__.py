@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,11 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from .paddleocr import *
-
-__version__ = paddleocr.VERSION
-__all__ = [
-    'PaddleOCR', 'PPStructure', 'draw_ocr', 'draw_structure_result',
-    'save_structure_res', 'download_with_progressbar', 'sorted_layout_boxes',
-    'convert_info_docx'
-]

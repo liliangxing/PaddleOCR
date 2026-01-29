@@ -6,7 +6,9 @@ comments: true
 
 PaddleOCR-VL is an advanced and efficient document parsing model designed specifically for element recognition in documents. Its core component is PaddleOCR-VL-0.9B, a compact yet powerful Vision-Language Model (VLM) composed of a NaViT-style dynamic resolution visual encoder and the ERNIE-4.5-0.3B language model, enabling precise element recognition. The model supports 109 languages and excels in recognizing complex elements (such as text, tables, formulas, and charts) while maintaining extremely low resource consumption. Comprehensive evaluations on widely used public benchmarks and internal benchmarks demonstrate that PaddleOCR-VL achieves SOTA performance in both page-level document parsing and element-level recognition. It significantly outperforms existing Pipeline-based solutions, document parsing multimodal schemes, and advanced general-purpose multimodal large models, while offering faster inference speeds. These advantages make it highly suitable for deployment in real-world scenarios.
 
-<img src="https://raw.githubusercontent.com/cuicheng01/PaddleX_doc_images/refs/heads/main/images/paddleocr_vl/metrics/allmetric.png"/>
+**On January 29, 2026, we released PaddleOCR-VL-1.5. PaddleOCR-VL-1.5 not only significantly improved the accuracy on the OmniDocBench v1.5 evaluation set to 94.5%, but also innovatively supports irregular-shaped bounding box localization. As a result, PaddleOCR-VL-1.5 demonstrates outstanding performance in real-world scenarios such as Skew, Warping, Screen Photography, Illumination, and Scanning. In addition, the model has added new capabilities for seal (stamp) recognition and text detection and recognition, with key metrics continuing to lead the industry.**
+
+<img src="https://raw.githubusercontent.com/cuicheng01/PaddleX_doc_images/refs/heads/main/images/paddleocr_vl_1_5/paddleocr-vl-1.5_metrics.png"/>
 
 ## Process Guide
 
@@ -638,14 +640,12 @@ for res in output:
     res.save_to_markdown(save_path="output") ## Save the current image's result in Markdown format
 ```
 
-For PDF files, each page will be processed individually and generate a separate Markdown file. If you want to convert the entire PDF to a single Markdown file, use the following method:
+For PDF files, each page will be processed individually, and a separate Markdown file will be generated for each page. If you wish to perform cross-page table merging, reconstruct multi-level labels, or merge multi-page results, you can achieve this using the following method:
 
 ```python
-from pathlib import Path
 from paddleocr import PaddleOCRVL
 
 input_file = "./your_pdf_file.pdf"
-output_path = Path("./output")
 
 # NVIDIA GPU
 pipeline = PaddleOCRVL()
@@ -658,28 +658,16 @@ pipeline = PaddleOCRVL()
 
 output = pipeline.predict(input=input_file)
 
-markdown_list = []
-markdown_images = []
+pages_res = list(output)
 
+output = pipeline.restructure_pages(pages_res)
+# output = pipeline.restructure_pages(pages_res, merge_table=True) # Merge tables across pages
+# output = pipeline.restructure_pages(pages_res, merge_table=True, relevel_titles=True) # Merge tables across pages and reconstruct multi-level titles
+# output = pipeline.restructure_pages(pages_res, merge_table=True, relevel_titles=True, merge_pages=True) # Merge tables across pages, reconstruct multi-level titles, and merge multiple pages
 for res in output:
-    md_info = res.markdown
-    markdown_list.append(md_info)
-    markdown_images.append(md_info.get("markdown_images", {}))
-
-markdown_texts = pipeline.concatenate_markdown_pages(markdown_list)
-
-mkd_file_path = output_path / f"{Path(input_file).stem}.md"
-mkd_file_path.parent.mkdir(parents=True, exist_ok=True)
-
-with open(mkd_file_path, "w", encoding="utf-8") as f:
-    f.write(markdown_texts)
-
-for item in markdown_images:
-    if item:
-        for path, image in item.items():
-            file_path = output_path / path
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            image.save(file_path)
+    res.print() ## Print the structured prediction output
+    res.save_to_json(save_path="output") ## Save the current image's structured result in JSON format
+    res.save_to_markdown(save_path="output") ## Save the current image's result in Markdown format
 ```
 
 If you need to process multiple files, **it is recommended to pass the directory path containing the files or a list of file paths to the `predict` method** to maximize processing efficiency. For example:
@@ -697,7 +685,6 @@ output = pipeline.predict(["imgs/file1.png", "imgs/file2.png", "imgs/file3.png"]
 
 **Note:**
 
-- In the example code, the parameters `use_doc_orientation_classify` and  `use_doc_unwarping` are all set to `False` by default. These indicate that document orientation classification and document image unwarping are disabled. You can manually set them to `True` if needed.
 
 The above Python script performs the following steps:
 
@@ -1217,8 +1204,6 @@ Setting it to <code>None</code> means using the instantiation parameter; otherwi
   <li><code>chart_max_pixels</code>: Maximum resolution for charts</li>
   <li><code>formula_min_pixels</code>: Minimum resolution for formulas</li>
   <li><code>formula_max_pixels</code>: Maximum resolution for formulas</li>
-  <li><code>spotting_min_pixels</code>: Minimum resolution for grounding</li>
-  <li><code>spotting_max_pixels</code>: Maximum resolution for grounding</li>
   <li><code>seal_min_pixels</code>: Minimum resolution for seals</li>
   <li><code>seal_max_pixels</code>: Maximum resolution for seals</li>
 </ul></td>
@@ -1227,7 +1212,48 @@ Setting it to <code>None</code> means using the instantiation parameter; otherwi
 </tr>
 </table>
 </details>
-<details><summary>(3) Process the prediction results: The prediction result for each sample is a corresponding Result object, supporting operations such as printing, saving as an image, and saving as a <code>json</code> file:</summary>
+
+<details><summary>(3) Invoke the <code>restructure_pages()</code> method of the PaddleOCR-VL object to reconstruct pages from the multi-page results list of inference predictions. This method will return a reconstructed multi-page result or a merged single-page result. Below are the parameters of the <code>restructure_pages()</code> method and their descriptions:</summary>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+<th>Type</th>
+<th>Default Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>res_list</code></td>
+<td><b>Meaning:</b> The list of results predicted from a multi-page PDF inference.</td>
+<td><code>list|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>merge_tables</code></td>
+<td><b>Meaning:</b> Controls whether to merge tables across pages.</td>
+<td><code>Bool</code></td>
+<td><code>True</code></td>
+</tr>
+<tr>
+<td><code>relevel_titles</code></td>
+<td><b>Meaning:</b> Controls whether to perform multi-level table grading.</td>
+<td><code>Bool</code></td>
+<td><code>True</code></td>
+</tr>
+<tr>
+<td><code>concatenate_pages</code></td>
+<td><b>Meaning:</b> Controls whether to concatenate multi-page results into one page.</td>
+<td><code>Bool</code></td>
+<td><code>False</code></td>
+</tr>
+</tbody>
+</table>
+</details>
+
+
+<details><summary>(4) Process the prediction results: The prediction result for each sample is a corresponding Result object, supporting operations such as printing, saving as an image, and saving as a <code>json</code> file:</summary>
 <table>
 <thead>
 <tr>

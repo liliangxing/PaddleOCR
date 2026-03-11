@@ -22,7 +22,7 @@ metadata:
 
 ## When to Use This Skill
 
-✅ **Use Document Parsing for**:
+**Use Document Parsing for**:
 - Documents with tables (invoices, financial reports, spreadsheets)
 - Documents with mathematical formulas (academic papers, scientific documents)
 - Documents with charts and diagrams
@@ -30,7 +30,7 @@ metadata:
 - Complex document structures requiring layout analysis
 - Any document requiring structured understanding
 
-❌ **Use Text Recognition instead for**:
+**Use Text Recognition instead for**:
 - Simple text-only extraction
 - Quick OCR tasks where speed is critical
 - Screenshots or simple images with clear text
@@ -111,11 +111,11 @@ If the script execution fails (API not configured, network error, etc.):
 - If user asks for "main content", filter out headers/footers but show ALL body text
 
 **What this means**:
-- ✅ **DO**: Display complete text, all tables, all formulas as requested
-- ✅ **DO**: Present content using these fields: top-level `text`, `result[n].markdown`, and `result[n].prunedResult`
-- ❌ **DON'T**: Truncate with "..." unless content is excessively long (>10,000 chars)
-- ❌ **DON'T**: Summarize or provide excerpts when user asks for full content
-- ❌ **DON'T**: Say "Here's a preview" when user expects complete output
+- **DO**: Display complete text, all tables, all formulas as requested
+- **DO**: Present content using these fields: top-level `text`, `result[n].markdown`, and `result[n].prunedResult`
+- **DON'T**: Truncate with "..." unless content is excessively long (>10,000 chars)
+- **DON'T**: Summarize or provide excerpts when user asks for full content
+- **DON'T**: Say "Here's a preview" when user expects complete output
 
 **Example - Correct**:
 ```
@@ -132,7 +132,7 @@ Document Statistics:
 Quality: Excellent (confidence: 0.92)
 ```
 
-**Example - Incorrect** ❌:
+**Example - Incorrect**:
 ```
 User: "Extract all the text"
 Agent: "I found a document with multiple sections. Here's the beginning:
@@ -184,14 +184,7 @@ Then use:
 - `result[n].prunedResult` for structured parsing data (layout/content/confidence)
 - `result[n].markdown` for rendered page content
 
-**Example 3: Return Complete Parsing Output**
-```bash
-python scripts/vl_caller.py \
-  --file-url "URL" \
-  --pretty
-```
-
-**Example 4: Print JSON Without Saving**
+**Example 3: Print JSON Without Saving**
 ```bash
 python scripts/vl_caller.py \
   --file-url "URL" \
@@ -209,41 +202,39 @@ Then return:
 
 The error will show:
 ```
-Configuration error: API not configured. Get your API at: https://paddleocr.com
+PADDLEOCR_DOC_PARSING_API_URL not configured. Get your API at: https://paddleocr.com
 ```
 
 **Configuration workflow**:
 
-1. **Show the exact error message** to user (including the URL)
+1. **Show the exact error message** to the user (including the URL).
 
-2. **Tell user to provide credentials**:
+2. **Explain which environment variables are required**:
    ```
-   Please visit the URL above to get your PADDLEOCR_DOC_PARSING_API_URL and PADDLEOCR_ACCESS_TOKEN.
-   Once you have them, send them to me and I'll configure it automatically.
+   Configure these values in the host application, runtime environment, or another appropriate config file:
+   - PADDLEOCR_DOC_PARSING_API_URL
+   - PADDLEOCR_ACCESS_TOKEN
+   - Optional: PADDLEOCR_DOC_PARSING_TIMEOUT
    ```
 
-3. **When user provides credentials** (accept any format):
+3. **If the user provides credentials in chat** (accept any reasonable format):
    - `PADDLEOCR_DOC_PARSING_API_URL=https://xxx.paddleocr.com/layout-parsing, PADDLEOCR_ACCESS_TOKEN=abc123...`
    - `Here's my API: https://xxx and token: abc123`
    - Copy-pasted code format
    - Any other reasonable format
 
-4. **Parse credentials from user's message**:
-   - Extract PADDLEOCR_DOC_PARSING_API_URL value (look for URLs with paddleocr.com or similar)
-   - Extract PADDLEOCR_ACCESS_TOKEN value (long alphanumeric string, usually 40+ chars)
+4. **Parse and validate the values**:
+   - Extract `PADDLEOCR_DOC_PARSING_API_URL` (look for URLs with `paddleocr.com` or similar)
+   - Confirm `PADDLEOCR_DOC_PARSING_API_URL` is a full endpoint ending with `/layout-parsing`
+   - Extract `PADDLEOCR_ACCESS_TOKEN` (long alphanumeric string, usually 40+ chars)
+   - Tell the user exactly which environment variables to set
 
-5. **Configure automatically**:
-   ```bash
-   python scripts/configure.py --api-url "PARSED_URL" --token "PARSED_TOKEN"
-   ```
+5. **Ask the user to confirm the environment is configured**:
+   - Wait for the user to confirm these values have been set in their host application, runtime environment, or appropriate config file
+   - For security reasons, do not run `configure.py` or create a local `.env` file by default if the skill is installed under a host application directory (for example, `~/.claude/skills`)
 
-6. **If configuration succeeds**:
-   - Inform user: "Configuration complete! Parsing document now..."
-   - Retry the original parsing task
-
-7. **If configuration fails**:
-   - Show the error
-   - Ask user to verify the credentials
+6. **Retry only after confirmation**:
+   - Once the user confirms the environment variables are available, retry the original parsing task
 
 **IMPORTANT**: The error message format is STRICT and must be shown exactly as provided by the script. Do not modify or paraphrase it.
 
@@ -301,10 +292,9 @@ error: Unsupported file format
 
 ## Reference Documentation
 
-For in-depth understanding of the PaddleOCR Document Parsing system, refer to:
 - `references/output_schema.md` - Output format specification
 
-> **Note**: Model version and capabilities are determined by your API endpoint (PADDLEOCR_DOC_PARSING_API_URL).
+> **Note**: Model version and capabilities are determined by your API endpoint (`PADDLEOCR_DOC_PARSING_API_URL`).
 
 Load these reference documents into context when:
 - Debugging complex parsing issues

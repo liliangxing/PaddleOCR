@@ -83,8 +83,12 @@ Examples:
   # Print JSON to stdout without saving a file
   python scripts/paddleocr-text-recognition/ocr_caller.py --file-url "URL" --stdout --pretty
 Configuration:
-  Run: python scripts/paddleocr-text-recognition/configure.py
-  Or set in .env: PADDLEOCR_OCR_API_URL, PADDLEOCR_ACCESS_TOKEN
+  Preferred when the skill is installed: set environment variables in your shell, host application, or runtime environment:
+    PADDLEOCR_OCR_API_URL, PADDLEOCR_ACCESS_TOKEN
+    Optional: PADDLEOCR_OCR_TIMEOUT
+  For repository-local setup:
+    python scripts/configure.py
+  or use a local .env file loaded by the skills runtime
         """,
     )
 

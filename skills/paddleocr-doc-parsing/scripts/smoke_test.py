@@ -19,8 +19,8 @@ Smoke Test for PaddleOCR Document Parsing Skill
 Verifies configuration and API connectivity.
 
 Usage:
-    python skills/paddleocr-doc-parsing/scripts/smoke_test.py
-    python skills/paddleocr-doc-parsing/scripts/smoke_test.py --skip-api-test
+    python paddleocr-doc-parsing/scripts/smoke_test.py
+    python paddleocr-doc-parsing/scripts/smoke_test.py --skip-api-test
 """
 
 import argparse
@@ -45,12 +45,18 @@ HOW TO GET YOUR API CREDENTIALS
 4. In Example Code, copy the API URL value
 5. In Example Code, copy the Access Token value
 
-Then configure:
-  python skills/paddleocr-doc-parsing/scripts/configure.py
+If the skill is not installed, configure credentials using one of the following options:
 
-Or manually create .env file in project root:
+Option A: run the helper script for this skill:
+  python paddleocr-doc-parsing/scripts/configure.py
+
+Option B: create a local .env file from the template:
+  cp .env.example .env
   PADDLEOCR_DOC_PARSING_API_URL=https://your-api-url.paddleocr.com/layout-parsing
   PADDLEOCR_ACCESS_TOKEN=your_token_here
+  PADDLEOCR_DOC_PARSING_TIMEOUT=600  # optional
+
+If the skill is installed under a host application directory (for example, `~/.claude/skills`), do not run `configure.py` or create a local `.env` file there. Use the host application's environment-variable configuration instead.
 
 ============================================================
 """
@@ -156,10 +162,8 @@ def main():
     print("Smoke Test PASSED")
     print("=" * 60)
     print("\nNext steps:")
-    print('  python skills/paddleocr-doc-parsing/scripts/vl_caller.py --file-url "URL"')
-    print(
-        '  python skills/paddleocr-doc-parsing/scripts/vl_caller.py --file-path "doc.pdf"'
-    )
+    print('  python paddleocr-doc-parsing/scripts/vl_caller.py --file-url "URL"')
+    print('  python paddleocr-doc-parsing/scripts/vl_caller.py --file-path "doc.pdf"')
     print(
         "  Results are auto-saved to the system temp directory; the caller prints the saved path."
     )

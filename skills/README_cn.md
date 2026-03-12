@@ -63,10 +63,10 @@ git clone https://github.com/PaddlePaddle/PaddleOCR.git
 
 | Skill | 必填 | 可选 |
 | --- | --- | --- |
-| `paddleocr-text-recognition` | `PADDLEOCR_OCR_API_URL`（API URL）、`PADDLEOCR_ACCESS_TOKEN`（access token） | `PADDLEOCR_OCR_TIMEOUT`（超时时间） |
-| `paddleocr-doc-parsing` | `PADDLEOCR_DOC_PARSING_API_URL`（API URL）、`PADDLEOCR_ACCESS_TOKEN`（access token） | `PADDLEOCR_DOC_PARSING_TIMEOUT`（超时时间） |
+| `paddleocr-text-recognition` | `PADDLEOCR_OCR_API_URL`（API URL）、`PADDLEOCR_ACCESS_TOKEN`（access token） | `PADDLEOCR_OCR_TIMEOUT`（API 请求超时时间） |
+| `paddleocr-doc-parsing` | `PADDLEOCR_DOC_PARSING_API_URL`（API URL）、`PADDLEOCR_ACCESS_TOKEN`（access token） | `PADDLEOCR_DOC_PARSING_TIMEOUT`（API 请求超时时间） |
 
-可以直接用自然语言告诉 AI（例如：”我需要配置 paddleocr-text-recognition skill”），也可以手动配置。以下是部分 AI 应用的手动配置方式：
+以下是部分 AI 应用的配置方式：
 
 - **Claude Code**：在项目的 `.claude/settings.local.json` 中添加 `env` 字段：
 
@@ -104,6 +104,8 @@ git clone https://github.com/PaddlePaddle/PaddleOCR.git
     }
   }
   ```
+
+  请注意这种方式可能在配置文件中明文存储 access token。更安全的方式是通过 OpenClaw onboarding wizard 或者 dashboard 配置。
 
 ### 使用示例
 

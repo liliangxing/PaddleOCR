@@ -63,10 +63,10 @@ After installation, configure the required environment variables so the skills c
 
 | Skill | Required | Optional |
 | --- | --- | --- |
-| `paddleocr-text-recognition` | `PADDLEOCR_OCR_API_URL` (API URL), `PADDLEOCR_ACCESS_TOKEN` (access token) | `PADDLEOCR_OCR_TIMEOUT` (timeout) |
-| `paddleocr-doc-parsing` | `PADDLEOCR_DOC_PARSING_API_URL` (API URL), `PADDLEOCR_ACCESS_TOKEN` (access token) | `PADDLEOCR_DOC_PARSING_TIMEOUT` (timeout) |
+| `paddleocr-text-recognition` | `PADDLEOCR_OCR_API_URL` (API URL), `PADDLEOCR_ACCESS_TOKEN` (access token) | `PADDLEOCR_OCR_TIMEOUT` (API request timeout) |
+| `paddleocr-doc-parsing` | `PADDLEOCR_DOC_PARSING_API_URL` (API URL), `PADDLEOCR_ACCESS_TOKEN` (access token) | `PADDLEOCR_DOC_PARSING_TIMEOUT` (API request timeout) |
 
-You can ask the AI in natural language (e.g., "I need to configure paddleocr-text-recognition skill"), or configure manually. Below are manual configuration methods for some AI apps:
+Below are configuration methods for some AI apps:
 
 - **Claude Code**: add an `env` field to `.claude/settings.local.json` in your project:
 
@@ -104,6 +104,8 @@ You can ask the AI in natural language (e.g., "I need to configure paddleocr-tex
     }
   }
   ```
+
+  Please note that this approach may store the access token in plain text in the configuration file. A more secure way is to configure it through the OpenClaw onboarding wizard or the dashboard.
 
 ### Usage Examples
 

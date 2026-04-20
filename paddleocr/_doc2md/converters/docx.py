@@ -27,6 +27,9 @@ _RE_H3 = re.compile(r"^（[一二三四五六七八九十百千]+）")
 # Regex for field-code hyperlink instruction
 _RE_FIELD_HYPERLINK = re.compile(r'HYPERLINK\s+"([^"]+)"')
 
+# Regex for page-number-only footer/header text (e.g. "第  页", "共 页", "- 3 -", "Page of")
+_RE_PAGE_ONLY = re.compile(r"^[\s第页共of\d\-/|·]*$", re.IGNORECASE)
+
 # Word XML namespace
 _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 _W = "{" + _W_NS + "}"
@@ -297,65 +300,73 @@ def _detect_heading_level(para, body_font_size: float) -> int:
     return 0
 
 
-def _parse_field_hyperlinks(para) -> dict:
-    """Parse w:fldChar field-code hyperlinks in a paragraph.
+class _FieldState:
+    """Mutable state for tracking w:fldChar field codes across paragraphs."""
 
-    Returns {id(run_element): url} for runs that are display text of a HYPERLINK field.
-    Handles nested fields (e.g. PAGEREF inside a hyperlink result phase) via depth counter.
+    __slots__ = ("active", "phase", "nest_depth", "url")
+    active: bool
+    phase: object  # None | "instr" | "result"
+    nest_depth: int
+    url: object  # None | str
+
+    def __init__(self):
+        self.active = False
+        self.phase = None  # None | "instr" | "result"
+        self.nest_depth = 0
+        self.url = None
+
+
+def _update_field_state_for_paragraph(para_element, field_state):
+    """Update field_state by scanning a paragraph element's runs.
+
+    Used for early-exit paragraphs (TOC / math / empty / code) to keep
+    cross-paragraph field tracking accurate without building item lists.
     """
-    field_urls: dict[int, str] = {}
-    phase = None  # None | "instr" | "result"
-    field_url = None
-    nest_depth = 0  # depth of nested fields inside result phase
-
-    for child in para._element:
+    for child in para_element:
         tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
         if tag != "r":
             continue
-        fld_char = child.find(f"{_W}fldChar")
+        fld_char = child.find(_W + "fldChar")
         if fld_char is not None:
-            fld_type = fld_char.get(f"{_W}fldCharType")
+            fld_type = fld_char.get(_W + "fldCharType")
             if fld_type == "begin":
-                if phase == "result":
-                    # Nested field (e.g. PAGEREF), increase depth and skip
-                    nest_depth += 1
+                if field_state.phase == "result":
+                    field_state.nest_depth += 1
                 else:
-                    phase = "instr"
-                    field_url = None
+                    field_state.active = True
+                    field_state.phase = "instr"
+                    field_state.url = None
             elif fld_type == "separate":
-                if nest_depth == 0:
-                    phase = "result"
+                if field_state.nest_depth == 0:
+                    field_state.phase = "result"
             elif fld_type == "end":
-                if nest_depth > 0:
-                    nest_depth -= 1
+                if field_state.nest_depth > 0:
+                    field_state.nest_depth -= 1
                 else:
-                    phase = None
-                    field_url = None
+                    field_state.active = False
+                    field_state.phase = None
+                    field_state.url = None
             continue
-
-        instr_elem = child.find(f"{_W}instrText")
-        if instr_elem is not None and phase == "instr" and nest_depth == 0:
+        instr_elem = child.find(_W + "instrText")
+        if instr_elem is not None and field_state.phase == "instr":
             if instr_elem.text:
                 m = _RE_FIELD_HYPERLINK.search(instr_elem.text)
                 if m:
-                    field_url = m.group(1)
-            continue
-
-        if phase == "result" and nest_depth == 0 and field_url:
-            t_elem = child.find(f"{_W}t")
-            if t_elem is not None and t_elem.text:
-                field_urls[id(child)] = field_url
-
-    return field_urls
+                    field_state.url = m.group(1)
 
 
-def _iter_paragraph_items(para) -> list:
+def _iter_paragraph_items(para, field_state=None) -> list:
     """Extract (bold, italic, underline, strikethrough, superscript, subscript, text, url) tuples from a paragraph in document order.
 
     Handles python-docx Hyperlink objects and w:fldChar field-code hyperlinks.
     Silently degrades to plain text on error.
-    Note: underline is forced to False inside Hyperlink runs to avoid Word's default hyperlink underline style.
+    Note: underline is forced to False inside Hyperlink/field-hyperlink runs to avoid Word's default hyperlink underline style.
+
+    field_state: optional _FieldState instance for cross-paragraph field tracking.
+                 If None, a fresh _FieldState is created (single-paragraph mode).
     """
+    if field_state is None:
+        field_state = _FieldState()
 
     def _split_breaks(items):
         """Expand items containing \\n (from <w:br/> soft line breaks) into per-line items with <br> separators."""
@@ -425,11 +436,6 @@ def _iter_paragraph_items(para) -> list:
             ]
         )
 
-    try:
-        field_urls = _parse_field_hyperlinks(para)
-    except Exception:
-        field_urls = {}
-
     items = []
     try:
         content_iter = para.iter_inner_content()
@@ -480,22 +486,75 @@ def _iter_paragraph_items(para) -> list:
                         (False, False, False, False, False, False, element.text, url)
                     )
             else:
+                # Plain Run — check for fldChar control elements first
+                fld_char = element._element.find(_W + "fldChar")
+                if fld_char is not None:
+                    fld_type = fld_char.get(_W + "fldCharType")
+                    if fld_type == "begin":
+                        if field_state.phase == "result":
+                            field_state.nest_depth += 1
+                        else:
+                            field_state.active = True
+                            field_state.phase = "instr"
+                            field_state.url = None
+                    elif fld_type == "separate":
+                        if field_state.nest_depth == 0:
+                            field_state.phase = "result"
+                    elif fld_type == "end":
+                        if field_state.nest_depth > 0:
+                            field_state.nest_depth -= 1
+                        else:
+                            field_state.active = False
+                            field_state.phase = None
+                            field_state.url = None
+                    continue
+
+                instr_elem = element._element.find(_W + "instrText")
+                if instr_elem is not None:
+                    if field_state.active and field_state.phase == "instr":
+                        # Extract HYPERLINK url from instrText
+                        if instr_elem.text:
+                            m = _RE_FIELD_HYPERLINK.search(instr_elem.text)
+                            if m:
+                                field_state.url = m.group(1)
+                    continue  # Never emit instrText run as content
+
                 # Plain Run
                 if not element.text:
                     continue
-                url = field_urls.get(id(element._element), "")
-                items.append(
-                    (
-                        _effective_bold(element, para),
-                        _effective_italic(element, para),
-                        _effective_underline(element, para),
-                        bool(element.font.strike),
-                        _effective_superscript(element),
-                        _effective_subscript(element),
-                        element.text,
-                        url,
+
+                # If we are in the result phase of a field-code hyperlink, apply URL
+                # and suppress underline (same as w:hyperlink element handling above).
+                if (
+                    field_state.phase == "result"
+                    and field_state.nest_depth == 0
+                    and field_state.url
+                ):
+                    items.append(
+                        (
+                            _effective_bold(element, para),
+                            _effective_italic(element, para),
+                            False,  # suppress underline for field hyperlinks
+                            bool(element.font.strike),
+                            _effective_superscript(element),
+                            _effective_subscript(element),
+                            element.text,
+                            field_state.url,
+                        )
                     )
-                )
+                else:
+                    items.append(
+                        (
+                            _effective_bold(element, para),
+                            _effective_italic(element, para),
+                            _effective_underline(element, para),
+                            bool(element.font.strike),
+                            _effective_superscript(element),
+                            _effective_subscript(element),
+                            element.text,
+                            "",
+                        )
+                    )
         except Exception:
             continue
 
@@ -1265,6 +1324,7 @@ def _convert_body(doc, *, extract_drawings=True) -> tuple:
             lines.append("")
             toc_buf.clear()
 
+    field_state = _FieldState()
     for child in _flatten_body(doc.element.body):
         tag = child.tag.split("}")[-1]
 
@@ -1278,6 +1338,7 @@ def _convert_body(doc, *, extract_drawings=True) -> tuple:
                 if toc_text:
                     toc_anchor = _extract_toc_anchor(child)
                     toc_buf.append((toc_text, toc_anchor, toc_level))
+                _update_field_state_for_paragraph(child, field_state)
                 continue
 
             # Non-TOC paragraph: flush any buffered TOC entries
@@ -1338,6 +1399,7 @@ def _convert_body(doc, *, extract_drawings=True) -> tuple:
                     lines.append(math_md)
                     lines.append("")
                 _flush_textbox()
+                _update_field_state_for_paragraph(child, field_state)
                 continue
 
             if not text:
@@ -1353,19 +1415,21 @@ def _convert_body(doc, *, extract_drawings=True) -> tuple:
                         code_buf.append("")  # preserve blank lines inside code blocks
                     elif lines and lines[-1] != "":
                         lines.append("")
+                _update_field_state_for_paragraph(child, field_state)
                 continue
 
             # Code paragraph: buffer it without heading/inline formatting
             if _is_code_paragraph(para):
                 code_buf.append(para.text)
                 _flush_textbox()
+                _update_field_state_for_paragraph(child, field_state)
                 continue
 
             # Non-code paragraph: flush any buffered code first
             flush_code_buf()
 
             level = _detect_heading_level(para, body_font_size)
-            inline = _runs_to_markdown(_iter_paragraph_items(para)) or text
+            inline = _runs_to_markdown(_iter_paragraph_items(para, field_state)) or text
 
             if level > 0:
                 # Strip outer **...** wrapping that headings may have inherited
@@ -1462,8 +1526,14 @@ def _extract_headers_footers(doc) -> tuple:
                     except Exception:
                         pass
                 text = " ".join(texts)
-                # Filter: skip empty text, pure digits (page numbers), and duplicates
-                if text and not text.strip().isdigit() and text not in seen:
+                # Filter: skip empty text, pure digits (page numbers),
+                # page-number patterns (e.g. "第  页", "第6页", "共 页"), and duplicates
+                if (
+                    text
+                    and not text.strip().isdigit()
+                    and not _RE_PAGE_ONLY.match(text.strip())
+                    and text not in seen
+                ):
                     seen.add(text)
                     results.append(text)
             except Exception:

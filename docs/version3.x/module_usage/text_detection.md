@@ -9,7 +9,7 @@ comments: true
 
 ## 二、支持模型列表
 
-> 推理耗时仅包含模型推理耗时，不包含前后处理耗时。
+> 推理耗时仅包含模型推理耗时，不包含前后处理耗时。表格中的“常规模式”耗时对应本地 <code>paddle_static</code> 推理引擎。
 
 <table>
 <thead>
@@ -77,7 +77,7 @@ comments: true
               <li><strong>软件环境：</strong>
                   <ul>
                       <li>Ubuntu 20.04 / CUDA 11.8 / cuDNN 8.9 / TensorRT 8.6.1.6</li>
-                      <li>paddlepaddle 3.0.0 / paddleocr 3.0.3</li>
+                      <li>paddlepaddle-gpu 3.0.0 / paddleocr 3.0.3</li>
                   </ul>
               </li>
           </ul>
@@ -155,6 +155,18 @@ paddleocr text_detection -i general_ocr_001.png --model_name PP-OCRv5_server_det
 paddleocr text_detection -i ./images/ --model_name PP-OCRv5_mobile_det
 ```
 
+上述示例默认使用 <code>paddle_static</code> 推理引擎，请先按照[飞桨框架安装](../paddlepaddle_installation.md)完成 PaddlePaddle 安装。
+
+如果选择 `transformers` 作为推理引擎，请确保已配置 Transformers 环境，然后执行如下命令：
+
+```bash
+# 使用 transformers 引擎进行推理
+paddleocr text_detection -i https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_ocr_001.png \
+    --engine transformers
+```
+
+在大多数场景下，默认的 `paddle_static` 推理引擎通常具备更好的推理性能，建议优先使用。
+
 <b>注：</b>PaddleOCR 官方模型默认从 HuggingFace 获取，如运行环境访问 HuggingFace 不便，可通过环境变量修改模型源为 BOS：`PADDLE_PDX_MODEL_SOURCE="BOS"`，未来将支持更多主流模型源；
 
 ### 3.3 Python API 使用
@@ -170,6 +182,27 @@ for res in output:
     res.save_to_img(save_path="./output/")
     res.save_to_json(save_path="./output/res.json")
 ```
+
+上述示例默认使用 <code>paddle_static</code> 推理引擎，请先按照[飞桨框架安装](../paddlepaddle_installation.md)完成 PaddlePaddle 安装。
+
+如果选择 `transformers` 作为推理引擎，请确保已配置 Transformers 环境，然后执行如下代码：
+
+```python
+from paddleocr import TextDetection
+model = TextDetection(
+    model_name="PP-OCRv5_server_det",
+    engine="transformers",
+)
+output = model.predict("general_ocr_001.png", batch_size=1)
+for res in output:
+    res.print()
+    res.save_to_img(save_path="./output/")
+    res.save_to_json(save_path="./output/res.json")
+```
+
+在大多数场景下，默认的 `paddle_static` 推理引擎通常具备更好的推理性能，建议优先使用。
+
+训练后的模型如果想使用 `paddle_dynamic` 或 `transformers` 引擎，请参考后文 [推理引擎](#五推理引擎) 中的 [权重转换](#52-权重转换) 部分将模型由 `pdparams` 格式通过 PaddleX 转换为 `safetensors` 格式。
 
 运行后，得到的结果为：
 
@@ -232,6 +265,18 @@ for res in output:
 默认情况下，优先使用 GPU 0；若不可用则使用 CPU。
 </td>
 <td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td><b>含义：</b>推理引擎。<br><b>说明：</b>支持 <code>None</code>（默认值）、<code>paddle</code>、<code>paddle_static</code>、<code>paddle_dynamic</code>、<code>transformers</code>。保持为默认值 <code>None</code> 时，本地推理默认使用 <code>paddle_static</code> 引擎。详细说明、取值、兼容性规则与示例请参见 <a href="../inference_engine.md">推理引擎与配置说明</a>。</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine_config</code></td>
+<td><b>含义：</b>推理引擎配置。<br><b>说明：</b>推荐与 <code>engine</code> 搭配使用。详细字段、兼容性规则与示例请参见 <a href="../inference_engine.md">推理引擎与配置说明</a>。</td>
+<td><code>dict|None</code></td>
 <td><code>None</code></td>
 </tr>
 <tr>
@@ -576,9 +621,97 @@ python3 tools/export_model.py -c configs/det/PP-OCRv5/PP-OCRv5_server_det.yml -o
  ```
 至此，二次开发完成，该静态图模型可以直接集成到 PaddleOCR 的 API 中。
 
-## 五、常见问题与解决方案
+训练后的模型如果想使用 `paddle_dynamic` 或 `transformers` 引擎，请参考后文 [推理引擎](#五推理引擎) 中的 [权重转换](#52-权重转换) 部分将模型由 `pdparams` 格式通过 PaddleX 转换为 `safetensors` 格式。
 
-### 5.1 性能优化问题
+## 五、推理引擎 {#五推理引擎}
+
+关于推理引擎的详细说明、取值、兼容性规则与示例请参见 <a href="../inference_engine.md">推理引擎与配置说明</a>。
+
+### 5.1 速度数据
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>model</th>
+            <th>engine</th>
+            <th>Preprocessing (ms)</th>
+            <th>Inference (ms)</th>
+            <th>PostProcessing (ms)</th>
+            <th>End-to-End (ms)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan="3">PP-OCRv5_mobile_det</td>
+            <td>paddle_static</td>
+            <td>11.43</td>
+            <td>13.80</td>
+            <td>2.15</td>
+            <td>27.58</td>
+        </tr>
+        <tr>
+            <td>paddle_dynamic</td>
+            <td>11.70</td>
+            <td>48.36</td>
+            <td>2.47</td>
+            <td>62.71</td>
+        </tr>
+        <tr>
+            <td>transformers</td>
+            <td>14.05</td>
+            <td>18.45</td>
+            <td>3.98</td>
+            <td>37.54</td>
+        </tr>
+        <tr>
+            <td rowspan="3">PP-OCRv5_server_det</td>
+            <td>paddle_static</td>
+            <td>13.24</td>
+            <td>26.91</td>
+            <td>2.63</td>
+            <td>43.05</td>
+        </tr>
+        <tr>
+            <td>paddle_dynamic</td>
+            <td>11.82</td>
+            <td>45.56</td>
+            <td>2.52</td>
+            <td>60.10</td>
+        </tr>
+        <tr>
+            <td>transformers</td>
+            <td>14.56</td>
+            <td>13.76</td>
+            <td>7.44</td>
+            <td>36.76</td>
+        </tr>
+    </tbody>
+</table>
+
+<strong>测试环境说明:</strong>
+<ul>
+    <li><strong>测试数据：</strong>[示例图片](https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_ocr_001.jpg)</li>
+    <li><strong>硬件配置：</strong>
+        <ul>
+            <li>GPU：NVIDIA A100 40G</li>
+            <li>CPU：Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz</li>
+        </ul>
+    </li>
+    <li><strong>软件环境：</strong>
+        <ul>
+            <li>Ubuntu 22.04 / CUDA 12.6 / cuDNN 9.5</li>
+            <li>paddlepaddle-gpu 3.2.1 / paddleocr 3.5 / transformers 5.4.0 / torch 2.10</li>
+        </ul>
+    </li>
+</ul>
+
+### 5.2 权重转换 {#52-权重转换}
+
+使用推理引擎时，系统会自动下载官方预训练模型。若需使用自训练模型配合 `paddle_dynamic` 或 `transformers` 引擎，请参考 [PaddleX 文本检测模块权重转换](https://paddlepaddle.github.io/PaddleX/latest/module_usage/tutorials/ocr_modules/text_detection.html#442) 部分，将 `pdparams` 格式通过 PaddleX 转换为 `safetensors` 格式，即可无缝集成到 PaddleOCR 的 API 中进行推理。
+
+## 六、常见问题与解决方案
+
+### 6.1 性能优化问题
 
 #### Q: GPU推理速度慢怎么办？
 
@@ -598,7 +731,7 @@ python3 tools/export_model.py -c configs/det/PP-OCRv5/PP-OCRv5_server_det.yml -o
 （4）限制GPU内存使用：设置`gpu_mem=200`
 （5）使用移动端模型：切换到`PP-OCRv5_mobile`系列模型
 
-### 5.2 检测精度问题
+### 6.2 检测精度问题
 
 #### Q: 检测框不准确或漏检怎么办？
 
@@ -616,7 +749,7 @@ model = TextDetection(
 （2）使用更精确的后处理模式：设置`det_db_score_mode="slow"`
 （3）启用膨胀处理：设置`use_dilation=True`
 
-### 5.3 模型选择建议
+### 6.3 模型选择建议
 
 #### Q: 如何选择合适的模型？
 
@@ -626,7 +759,7 @@ model = TextDetection(
 - 实时处理：使用`PP-OCRv5_mobile_det`，推理速度快
 - 批量处理：使用`PP-OCRv5_server_det`，精度高
 
-### 5.4 参数调优建议
+### 6.4 参数调优建议
 
 #### Q: 如何调优检测参数？
 
@@ -641,7 +774,7 @@ model = TextDetection(
 - **高速度配置**：`limit_side_len=640`, `thresh=0.5`, `box_thresh=0.7`, `unclip_ratio=1.2`
 - **平衡配置**：`limit_side_len=960`, `thresh=0.4`, `box_thresh=0.6`, `unclip_ratio=1.5`
 
-### 5.5 错误处理
+### 6.5 错误处理
 
 #### Q: 模型加载失败怎么办？
 

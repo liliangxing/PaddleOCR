@@ -40,7 +40,19 @@ Run the following command to get started instantly:
 
 ```bash
 paddleocr chart_parsing -i "{'image': 'https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/chart_parsing_02.png'}"
-````
+```
+
+The example above uses the <code>paddle_dynamic</code> inference engine by default. To run it, first install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+
+If you choose `transformers` as the inference engine, make sure the Transformers environment is configured, and then run the following command:
+
+```bash
+# Use the transformers engine for inference
+paddleocr chart_parsing -i "{'image': 'https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/chart_parsing_02.png'}" \
+    --engine transformers
+```
+
+In most scenarios, the default `paddle_dynamic` inference engine delivers better inference performance and is the recommended first choice.
 
 **Note:** By default, PaddleOCR retrieves models from HuggingFace. If HuggingFace access is restricted in your environment, you can switch the model source to BOS by setting the environment variable: `PADDLE_PDX_MODEL_SOURCE="BOS"`. Support for more mainstream sources is planned.
 
@@ -57,6 +69,27 @@ for res in results:
     res.print()
     res.save_to_json(f"./output/res.json")
 ```
+
+The example above uses the <code>paddle_dynamic</code> inference engine by default. To run it, first install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+
+If you choose `transformers` as the inference engine, make sure the Transformers environment is configured, and then run the following code:
+
+```python
+from paddleocr import ChartParsing
+model = ChartParsing(
+    model_name="PP-Chart2Table",
+    engine="transformers",
+)
+results = model.predict(
+    input={"image": "chart_parsing_02.png"},
+    batch_size=1
+)
+for res in results:
+    res.print()
+    res.save_to_json(f"./output/res.json")
+```
+
+In most scenarios, the default `paddle_dynamic` inference engine delivers better inference performance and is the recommended first choice.
 
 The output result will be:
 
@@ -118,6 +151,18 @@ If set to <code>None</code>, defaults to <code>PP-Chart2Table</code>.</td>
 Defaults to GPU 0 if available; otherwise falls back to CPU.
 </td>
 <td><code>str | None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td><b>Meaning:</b> Inference engine.<br/><b>Description:</b> Supports <code>None</code> (the default), <code>paddle</code>, <code>paddle_dynamic</code>, and <code>transformers</code>. When left as <code>None</code>, local inference uses the <code>paddle_dynamic</code> engine by default. For detailed descriptions, supported values, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine_config</code></td>
+<td><b>Meaning:</b> Inference-engine configuration.<br/><b>Description:</b> Recommended together with <code>engine</code>. For supported fields, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>dict|None</code></td>
 <td><code>None</code></td>
 </tr>
 </tbody>
@@ -232,4 +277,57 @@ Any positive integer.</td>
 
 Currently, this module supports inference only and does not yet support fine-tuning. Fine-tuning capabilities are planned for future releases.
 
-## 5. FAQ
+## 5. Inference Engine
+
+For detailed descriptions, values, compatibility rules, and examples of the inference engine, please refer to <a href="../inference_engine.en.md">Inference Engine and Configuration Description</a>.
+
+### 5.1 Speed Data
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>model</th>
+            <th>engine</th>
+            <th>Preprocessing (ms)</th>
+            <th>Inference (ms)</th>
+            <th>PostProcessing (ms)</th>
+            <th>End-to-End (ms)</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td rowspan="2">PP-Chart2Table</td>
+            <td>paddle_dynamic</td>
+            <td>53.00</td>
+            <td>17863.95</td>
+            <td>0.30</td>
+            <td>17917.78</td>
+        </tr>
+        <tr>
+            <td>transformers</td>
+            <td>23.95</td>
+            <td>12217.37</td>
+            <td>0.47</td>
+            <td>12269.98</td>
+        </tr>
+    </tbody>
+</table>
+
+<strong>Test Environment Description:</strong>
+<ul>
+    <li><strong>Test Data:</strong> [Sample Image](https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/medal_table.jpg)</li>
+    <li><strong>Hardware Configuration:</strong>
+        <ul>
+            <li>GPU: NVIDIA A100 40G</li>
+            <li>CPU: Intel(R) Xeon(R) Gold 6248 CPU @ 2.50GHz</li>
+        </ul>
+    </li>
+    <li><strong>Software Environment:</strong>
+        <ul>
+            <li>Ubuntu 22.04 / CUDA 12.6 / cuDNN 9.5</li>
+            <li>paddlepaddle-gpu 3.2.1 / paddleocr 3.5 / transformers 5.4.0 / torch 2.10</li>
+        </ul>
+    </li>
+</ul>
+
+## 6. FAQ

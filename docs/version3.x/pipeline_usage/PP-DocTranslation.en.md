@@ -13,6 +13,7 @@ PP-DocTranslation is a document intelligent translation solution provided by Pad
 In this pipeline, you can select the model to use based on the benchmark data below.
 
 > The inference time only includes the model inference time and does not include the time for pre- or post-processing.
+> In the inference time columns labeled [Regular Mode / High-Performance Mode], the `Regular Mode` values correspond to local Paddle inference engines. Each module selects the appropriate local Paddle inference engine according to the default model name: models that support only dynamic graph use `paddle_dynamic`, while models that support both static and dynamic graph prefer `paddle_static`.
 
 <details><summary> 👉Model List Details</summary>
 <p><b>Document Image Orientation Classification Module:</b></p>
@@ -644,7 +645,7 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">Inference Model</a>/<a href="https://p
               <li><strong>Software Environment:</strong>
                   <ul>
                       <li>Ubuntu 20.04 / CUDA 11.8 / cuDNN 8.9 / TensorRT 8.6.1.6</li>
-                      <li>paddlepaddle 3.0.0 / paddleocr 3.0.3</li>
+                      <li>paddlepaddle-gpu 3.0.0 / paddleocr 3.0.3</li>
                   </ul>
               </li>
           </ul>
@@ -666,7 +667,7 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">Inference Model</a>/<a href="https://p
             <td>Regular Mode</td>
             <td>FP32 Precision / No TRT Acceleration</td>
             <td>FP32 Precision / 8 Threads</td>
-            <td>PaddleInference</td>
+            <td>Local Paddle inference engines (by default, the engine is selected according to the default model name; if both static and dynamic graph are available, <code>paddle_static</code> is preferred)</td>
         </tr>
         <tr>
             <td>High-Performance Mode</td>
@@ -693,6 +694,16 @@ You can download the [test file](https://paddle-model-ecology.bj.bcebos.com/padd
 
 ```bash
 paddleocr pp_doctranslation -i vehicle_certificate-1.png --target_language en --qianfan_api_key your_api_key
+```
+
+The examples above use local Paddle inference engines by default. By default, each module selects the appropriate local Paddle inference engine according to the default model name: models that support only dynamic graph use `paddle_dynamic`, while models that support both static and dynamic graph prefer `paddle_static`. To run them, first install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+
+If you choose `transformers` as the inference engine, make sure the Transformers environment is configured by following [Inference Engine and Configuration](../inference_engine.en.md), and then run the following command:
+
+```bash
+# Use the transformers engine for inference
+paddleocr pp_doctranslation -i vehicle_certificate-1.png --target_language en --qianfan_api_key your_api_key \
+    --engine transformers
 ```
 
 <details><summary><b>Command line supports more parameter settings. Click to expand for detailed description of command line parameters</b></summary>
@@ -1263,50 +1274,59 @@ Supports specifying exact card number:
 <td></td>
 </tr>
 <tr>
+<td><code>engine</code></td>
+<td><b>Meaning:</b> Inference engine.<br/><b>Description:</b> Supports <code>None</code> (the default), <code>paddle</code>, <code>paddle_static</code>, <code>paddle_dynamic</code>, and <code>transformers</code>. When left as <code>None</code>, PaddleOCR preserves the behavior of earlier versions, which in most configurations is equivalent to <code>paddle</code>. For detailed descriptions, supported values, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>enable_hpi</code></td>
-<td><b>Meaning:</b>Whether to enable high-performance inference.</td>
+<td><b>Meaning:</b> Whether to enable high-performance inference.</td>
 <td><code>bool</code></td>
-<td><code>False</code></td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_tensorrt</code></td>
-<td><b>Meaning:</b>Whether to enable the TensorRT subgraph engine of Paddle Inference. <br/>
-<b>Description:</b> 
-If the model does not support acceleration by TensorRT, enabling this flag will not enable acceleration.<br/>
-For PaddlePaddle with CUDA 11.8, compatible TensorRT version is 8.x (x≥6), recommended TensorRT version is 8.6.1.6.<br/>
+<td><b>Meaning:</b> Whether to enable the TensorRT subgraph engine of Paddle Inference.<br/>
+<b>Description:</b>
+If the model does not support TensorRT acceleration, acceleration will not be used even if this flag is set.<br/>
+For CUDA 11.8 versions of PaddlePaddle, the compatible TensorRT version is 8.x (x>=6). TensorRT 8.6.1.6 is recommended.<br/>
 </td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
 </tr>
 <tr>
 <td><code>precision</code></td>
-<td><b>Meaning:</b>Computation precision, e.g. fp32, fp16.</td>
+<td><b>Meaning:</b> Computation precision, such as <code>fp32</code> or <code>fp16</code>.</td>
 <td><code>str</code></td>
 <td><code>fp32</code></td>
 </tr>
 <tr>
 <td><code>enable_mkldnn</code></td>
-<td><b>Meaning:</b>Whether to enable MKL-DNN accelerated inference. 
-<b>Description:</b> 
-If MKL-DNN is unavailable or the model does not support acceleration via MKL-DNN, enabling this flag will not enable acceleration.</td>
+<td><b>Meaning:</b> Whether to enable MKL-DNN accelerated inference.<br/>
+<b>Description:</b>
+If MKL-DNN is unavailable or the model does not support MKL-DNN acceleration, acceleration will not be used even if this flag is set.
+</td>
 <td><code>bool</code></td>
 <td><code>True</code></td>
 </tr>
 <tr>
 <td><code>mkldnn_cache_capacity</code></td>
-<td><b>Meaning:</b>MKL-DNN cache capacity.</td>
+<td>
+<b>Meaning:</b> MKL-DNN cache capacity.
+</td>
 <td><code>int</code></td>
 <td><code>10</code></td>
 </tr>
 <tr>
 <td><code>cpu_threads</code></td>
-<td><b>Meaning:</b>Number of threads used for inference on CPU.</td>
+<td><b>Meaning:</b> Number of threads used for inference on CPU.</td>
 <td><code>int</code></td>
-<td><code>8</code></td>
+<td><code>10</code></td>
 </tr>
 <tr>
 <td><code>paddlex_config</code></td>
-<td><b>Meaning:</b>Path to PaddleX pipeline configuration file.</td>
+<td><b>Meaning:</b> Path to the PaddleX pipeline configuration file.</td>
 <td><code>str</code></td>
 <td></td>
 </tr>
@@ -1353,7 +1373,72 @@ else:
         use_doc_unwarping=False,
         use_common_ocr=True,
         use_seal_recognition=True,
-use_table_recognition=True,
+        use_table_recognition=True,
+    )
+
+    ori_md_info_list = []
+    for res in visual_predict_res:
+        layout_parsing_result = res["layout_parsing_result"]
+        ori_md_info_list.append(layout_parsing_result.markdown)
+        layout_parsing_result.save_to_img(output_path)
+        layout_parsing_result.save_to_markdown(output_path)
+
+    # Concatenate the markdown information of multi-page documents into a single markdown file, and save the merged original markdown text
+    if input_path.lower().endswith(".pdf"):
+        ori_md_info = pipeline.concatenate_markdown_pages(ori_md_info_list)
+        ori_md_info.save_to_markdown(output_path)
+
+# Perform document translation (target language: English)
+tgt_md_info_list = pipeline.translate(
+    ori_md_info_list=ori_md_info_list,
+    target_language="en",
+    chunk_size=5000,
+    chat_bot_config=chat_bot_config,
+)
+# Save the translation results
+for tgt_md_info in tgt_md_info_list:
+    tgt_md_info.save_to_markdown(output_path)
+```
+
+The example above uses local Paddle inference engines by default. By default, each module selects the appropriate local Paddle inference engine according to the default model name: models that support only dynamic graph use `paddle_dynamic`, while models that support both static and dynamic graph prefer `paddle_static`. To run it, first install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+
+If you choose `transformers` as the inference engine, make sure the Transformers environment is configured by following [Inference Engine and Configuration](../inference_engine.en.md), and then run the following code:
+
+```python
+from paddleocr import PPDocTranslation
+
+# Create a translation pipeline
+pipeline = PPDocTranslation(
+    engine="transformers",
+)
+
+# Document path
+input_path = "document_sample.pdf"
+
+# Output directory
+output_path = "./output"
+
+# Large model configuration
+chat_bot_config = {
+    "module_name": "chat_bot",
+    "model_name": "ernie-3.5-8k",
+    "base_url": "https://qianfan.baidubce.com/v2",
+    "api_type": "openai",
+    "api_key": "api_key",  # your api_key
+}
+
+if input_path.lower().endswith(".md"):
+    # Read markdown documents, supporting passing in directories and url links with the .md suffix
+    ori_md_info_list = pipeline.load_from_markdown(input_path)
+else:
+    # Use PP-StructureV3 to perform layout parsing on PDF/image documents to obtain markdown information
+    visual_predict_res = pipeline.visual_predict(
+        input_path,
+        use_doc_orientation_classify=False,
+        use_doc_unwarping=False,
+        use_common_ocr=True,
+        use_seal_recognition=True,
+        use_table_recognition=True,
     )
 
     ori_md_info_list = []
@@ -2000,54 +2085,70 @@ Supports specifying a specific card number:
 <td><code>None</code></td>
 </tr>
 <tr>
+<td><code>engine</code></td>
+<td><b>Meaning:</b> Inference engine.<br/><b>Description:</b> Supports <code>None</code> (the default), <code>paddle</code>, <code>paddle_static</code>, <code>paddle_dynamic</code>, and <code>transformers</code>. When left as <code>None</code>, PaddleOCR preserves the behavior of earlier versions, which in most configurations is equivalent to <code>paddle</code>. For detailed descriptions, supported values, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine_config</code></td>
+<td><b>Meaning:</b> Inference-engine configuration.<br/><b>Description:</b> Recommended together with <code>engine</code>. For supported fields, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>dict|None</code></td>
+<td><code>None</code></td>
+</tr>
+
+<tr>
 <td><code>enable_hpi</code></td>
-<td><b>Meaning:</b>Whether to enable high-performance inference.</td>
+<td><b>Meaning:</b> Whether to enable high-performance inference.</td>
 <td><code>bool</code></td>
-<td><code>False</code></td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_tensorrt</code></td>
-<td><b>Meaning:</b>Whether to enable Paddle Inference’s TensorRT subgraph engine. <br/>
-<b>Description:</b> 
-If the model does not support acceleration via TensorRT, enabling this flag will have no effect.<br/>
-For Paddle with CUDA 11.8, the compatible TensorRT version is 8.x (x≥6), recommended installation is TensorRT 8.6.1.6.<br/>
+<td><b>Meaning:</b> Whether to enable the TensorRT subgraph engine of Paddle Inference.<br/>
+<b>Description:</b>
+If the model does not support TensorRT acceleration, acceleration will not be used even if this flag is set.<br/>
+For CUDA 11.8 versions of PaddlePaddle, the compatible TensorRT version is 8.x (x>=6). TensorRT 8.6.1.6 is recommended.<br/>
 </td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
 </tr>
 <tr>
 <td><code>precision</code></td>
-<td><b>Meaning:</b>Computation precision, such as fp32, fp16.</td>
+<td><b>Meaning:</b> Computation precision, such as <code>"fp32"</code> or <code>"fp16"</code>.</td>
 <td><code>str</code></td>
 <td><code>"fp32"</code></td>
 </tr>
 <tr>
 <td><code>enable_mkldnn</code></td>
-<td><b>Meaning:</b>Whether to enable MKL-DNN accelerated inference. <br/>
-<b>Description:</b> 
-If MKL-DNN is unavailable or the model does not support acceleration via MKL-DNN, enabling this flag will have no effect.
+<td><b>Meaning:</b> Whether to enable MKL-DNN accelerated inference.<br/>
+<b>Description:</b>
+If MKL-DNN is unavailable or the model does not support MKL-DNN acceleration, acceleration will not be used even if this flag is set.
 </td>
 <td><code>bool</code></td>
 <td><code>True</code></td>
 </tr>
 <tr>
 <td><code>mkldnn_cache_capacity</code></td>
-<td><b>Meaning:</b>MKL-DNN cache capacity.</td>
+<td>
+<b>Meaning:</b> MKL-DNN cache capacity.
+</td>
 <td><code>int</code></td>
 <td><code>10</code></td>
 </tr>
 <tr>
 <td><code>cpu_threads</code></td>
-<td><b>Meaning:</b>Number of threads used during inference on CPU.</td>
+<td><b>Meaning:</b> Number of threads used for inference on CPU.</td>
 <td><code>int</code></td>
-<td><code>8</code></td>
+<td><code>10</code></td>
 </tr>
 <tr>
 <td><code>paddlex_config</code></td>
-<td><b>Meaning:</b>Path to the PaddleX pipeline configuration file.</td>
+<td><b>Meaning:</b> Path to the PaddleX pipeline configuration file.</td>
 <td><code>str|None</code></td>
 <td><code>None</code></td>
 </tr>
+
 </tbody>
 </table>
 
@@ -2893,6 +2994,12 @@ Below are the API references for basic serving and examples of multi-language se
 <td>No</td>
 </tr>
 <tr>
+<td><code>outputFormats</code></td>
+<td><code>array</code> | <code>null</code></td>
+<td>Optional. Additional export formats; currently only <code>"docx"</code> is supported.</td>
+<td>No</td>
+</tr>
+<tr>
 <td><code>visualize</code></td>
 <td><code>boolean</code> | <code>null</code></td>
 <td>Whether to return visualization result images and intermediate images during processing.
@@ -2926,12 +3033,12 @@ By default, images will not be returned; the <code>visualize</code> parameter in
 <tr>
 <td><code>layoutParsingResults</code></td>
 <td><code>array</code></td>
-<td>Layout parsing results. The array length is 1 (for image input) or equals the actual number of processed pages (for PDF input). For PDF input, each element corresponds to the result of each processed page in order.</td>
+<td>Layout parsing results. The array length is 1 (for image input) or the number of document pages actually processed (for PDF input). For PDF input, each element in the array is the result of each processed page, in order.</td>
 </tr>
 <tr>
 <td><code>dataInfo</code></td>
 <td><code>object</code></td>
-<td>Input data information.</td>
+<td>Metadata about the input data.</td>
 </tr>
 </tbody>
 </table>
@@ -2965,6 +3072,11 @@ By default, images will not be returned; the <code>visualize</code> parameter in
 <td><code>string</code> | <code>null</code></td>
 <td>Input image. JPEG format, Base64 encoded.</td>
 </tr>
+<tr>
+<td><code>exports</code></td>
+<td><code>object</code> | <code>null</code></td>
+<td>Optional additional exports such as <code>docx</code>, present only when <code>outputFormats</code> is requested. The <code>content</code> field is Base64-encoded file bytes.</td>
+</tr>
 </tbody>
 </table>
 <p><code>markdown</code> is an <code>object</code> with the following properties:</p>
@@ -2985,17 +3097,17 @@ By default, images will not be returned; the <code>visualize</code> parameter in
 <tr>
 <td><code>images</code></td>
 <td><code>object</code></td>
-<td>Key-value pairs of Markdown image relative paths and Base64 encoded images.</td>
+<td>Mapping from relative Markdown image paths to Base64-encoded image data.</td>
 </tr>
 <tr>
 <td><code>isStart</code></td>
 <td><code>boolean</code></td>
-<td>Whether the first element on the current page is the start of a paragraph.</td>
+<td>Whether the first element on the current page starts a paragraph.</td>
 </tr>
 <tr>
 <td><code>isEnd</code></td>
 <td><code>boolean</code></td>
-<td>Whether the last element on the current page is the end of a paragraph.</td>
+<td>Whether the last element on the current page ends a paragraph.</td>
 </tr>
 </tbody>
 </table>
@@ -3122,7 +3234,7 @@ By default, images will not be returned; the <code>visualize</code> parameter in
 <tr>
 <td><code>markdown</code></td>
 <td><code>object</code></td>
-<td>Markdown result. Object definition is consistent with the <code>markdown</code> returned by the <code>analyzeImages</code> operation.</td>
+<td>Markdown result; same shape as <code>markdown</code> returned by <code>analyzeImages</code>.</td>
 </tr>
 </tbody>
 </table>

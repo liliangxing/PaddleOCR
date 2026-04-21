@@ -120,7 +120,7 @@ plugins:
             PaddleOCR-VL Apple Silicon 使用教程: PaddleOCR-VL Apple Silicon Usage Tutorial
             PaddleOCR-VL AMD GPU 使用教程: PaddleOCR-VL AMD GPU Usage Tutorial
             PaddleOCR-VL Intel Arc GPU 使用教程: PaddleOCR-VL Intel Arc GPU Usage Tutorial
-            推理部署: Model Deploy
+            推理部署: Inference and Deployment
             高性能推理: High-Performance Inference
             打包 PaddleOCR 项目: Package PaddleOCR Projects
             获取ONNX模型: Obtaining ONNX Models
@@ -149,6 +149,8 @@ plugins:
             通用表格识别v2产线: General Table Recognition v2 Pipeline
             图表解析模块: Chart Parsing Module
             PaddleOCR-VL产线: PaddleOCR-VL Pipeline
+            PP-DocTranslation产线: PP-DocTranslation Pipeline
+            推理引擎与配置说明: Inference Engine and Configuration
             多硬件使用: Multi-Devices Usage
             PaddleOCR 多硬件使用指南: PaddleOCR Multi-Devices Usage Guide
             昇腾 NPU 飞桨安装教程: Ascend NPU PaddlePaddle Installation Tutorial
@@ -184,7 +186,7 @@ plugins:
             社区: Community
             社区贡献: Community Contribution
             附录: Appendix
-            配置 PaddleOCR 推理包日志系统: Configure the logging system for the PaddleOCR inference package
+            配置 paddleocr 包日志系统: Configure logging for the paddleocr Python package
             模块概述: Module Overview
             产线概述: Pipeline Overview
             通用 OCR 产线 C++ 本地部署 - Linux: C++ Local Deployment for General OCR Pipeline - Linux
@@ -336,6 +338,7 @@ nav:
       - 通用 OCR 产线 C++ 本地部署 - Linux: version3.x/deployment/cpp/OCR.md
       - 通用 OCR 产线 C++ 本地部署 - Windows: version3.x/deployment/cpp/OCR_windows.md
     - Benchmark: version3.x/pipeline_usage/instructions/benchmark.md
+    - 推理引擎与配置说明: version3.x/inference_engine.md
 
   - 模块列表:
     - 模块概述: version3.x/module_usage/module_overview.md
@@ -368,7 +371,7 @@ nav:
   - 其他说明:
     - PaddleOCR 与 PaddleX: version3.x/paddleocr_and_paddlex.md
     - PaddleOCR 3.x 升级说明: update/upgrade_notes.md
-    - 配置 PaddleOCR 推理包日志系统: version3.x/logging.md
+    - 配置 paddleocr 包日志系统: version3.x/logging.md
 
   - 低代码全流程开发:
       - 概述: version3.x/paddlex/overview.md

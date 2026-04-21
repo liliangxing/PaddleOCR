@@ -4,6 +4,9 @@ comments: true
 
 # PaddleOCR-VL NVIDIA Blackwell-Architecture GPUs Usage Tutorial
 
+> INFO:
+> Unless otherwise specified, the term "PaddleOCR-VL" in this tutorial refers to the PaddleOCR-VL model series (e.g., PaddleOCR-VL-1.5). References specific to the PaddleOCR-VL v1 version will be explicitly noted.
+
 This tutorial provides guidance on using PaddleOCR-VL on NVIDIA Blackwell-architecture GPUs, covering the complete workflow from environment preparation to service deployment.
 
 NVIDIA Blackwell-architecture GPUs include, but are not limited to:
@@ -17,6 +20,9 @@ NVIDIA Blackwell-architecture GPUs include, but are not limited to:
 PaddleOCR-VL has been verified for accuracy and speed on the RTX 5070. However, due to hardware diversity, compatibility with other NVIDIA Blackwell-architecture GPUs has not yet been confirmed. We welcome the community to test on different hardware setups and share your results.
 
 Before starting the tutorial, **please ensure that your NVIDIA driver supports CUDA 12.9 or higher**.
+
+> TIP:
+> Before reading this hardware-specific tutorial, we recommend first reading the [Process Guide](./PaddleOCR-VL.en.md#process-guide) in the main [PaddleOCR-VL Usage Tutorial](./PaddleOCR-VL.en.md) to determine which chapters apply to your goal, and then returning here to read the corresponding sections.
 
 ## 1. Environment Preparation
 
@@ -77,9 +83,9 @@ python -m pip install -U "paddleocr[doc-parser]"
 
 Please refer to [PaddleOCR-VL Usage Tutorial - 2. Quick Start](./PaddleOCR-VL.en.md#2-quick-start).
 
-## 3. Improving VLM Inference Performance Using Inference Acceleration Frameworks
+## 3. Improving Inference Performance with VLM Inference Services
 
-The inference performance under default configurations may not be fully optimized and may not meet actual production requirements. This section introduces how to use the vLLM and SGLang inference acceleration frameworks to enhance PaddleOCR-VL's inference performance.
+The inference performance under default configurations may not be fully optimized and may not meet actual production requirements. This section introduces how to improve PaddleOCR-VL inference performance through a VLM inference service. In this hardware-specific guide, the examples use vLLM and SGLang as the backends for the VLM inference service.
 
 ### 3.1 Starting the VLM Inference Service
 
@@ -126,7 +132,7 @@ docker run \
 
 #### 3.1.2 Method 2: Installation and Usage via PaddleOCR CLI
 
-Due to potential dependency conflicts between inference acceleration frameworks and PaddlePaddle, it is recommended to install them in a virtual environment:
+Since inference acceleration frameworks may conflict with packages already installed in the current environment, it is recommended to install them in a virtual environment:
 
 ```shell
 # If a virtual environment is currently activated, deactivate it first using `deactivate`
@@ -155,6 +161,9 @@ paddleocr install_genai_server_deps <inference acceleration framework name>
 
 Currently supported framework names are `vllm` and `sglang`, corresponding to vLLM and SGLang, respectively.
 
+> WARNING:
+> The transformers library versions required by vLLM, SGLang and Transformers engine are currently incompatible, so Transformers engine cannot be installed together with vLLM or SGLang in the same environment. If using Transformers + vLLM or Transformers + SGLang inference, please deploy the layout detection model and VLM service in different environments.
+
 After installation, you can start the service using the `paddleocr genai_server` command:
 
 ```shell
@@ -174,7 +183,7 @@ The parameters supported by this command are as follows:
 
 ### 3.2 Client Usage
 
-Please refer to [PaddleOCR-VL Usage Tutorial - 3.2 Client Usage](./PaddleOCR-VL.en.md#32-client-usage-methods).
+For client-side invocation methods, please refer to [PaddleOCR-VL Usage Tutorial - 3.2 Client Usage Methods](./PaddleOCR-VL.en.md#32-client-usage-methods). If you run the client on this hardware, make sure to specify `device="gpu"`.
 
 ### 3.3 Performance Tuning
 

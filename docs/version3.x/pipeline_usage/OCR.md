@@ -23,6 +23,7 @@ OCR（光学字符识别，Optical Character Recognition）是一种将图像中
 在本产线中，您可以根据下方的基准测试数据选择使用的模型。
 
 > 推理耗时仅包含模型推理耗时，不包含前后处理耗时。
+> 在带有 [常规模式 / 高性能模式] 标记的推理耗时列中，`常规模式` 对应本地推理引擎 `paddle_static`。
 
 <details>
 <summary><b>文档图像方向分类模块（可选）：</b></summary>
@@ -662,7 +663,7 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">推理模型</a>/<a href="https://padd
               <li><strong>软件环境：</strong>
                   <ul>
                       <li>Ubuntu 20.04 / CUDA 11.8 / cuDNN 8.9 / TensorRT 8.6.1.6</li>
-                      <li>paddlepaddle 3.0.0 / paddleocr 3.0.3</li>
+                      <li>paddlepaddle-gpu 3.0.0 / paddleocr 3.0.3</li>
                   </ul>
               </li>
           </ul>
@@ -684,7 +685,7 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">推理模型</a>/<a href="https://padd
             <td>常规模式</td>
             <td>FP32精度 / 无TRT加速</td>
             <td>FP32精度 / 8线程</td>
-            <td>PaddleInference</td>
+            <td><code>paddle_static</code></td>
         </tr>
         <tr>
             <td>高性能模式</td>
@@ -702,13 +703,18 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">推理模型</a>/<a href="https://padd
 
 ## 2. 快速开始
 
-在本地使用通用OCR产线前，请确保您已经按照[安装教程](../installation.md)完成了wheel包安装。安装完成后，可以在本地使用命令行体验或 Python 集成。
+在本地使用通用 OCR 产线前，请先根据所选推理引擎安装对应依赖，再安装 `paddleocr` Python 包。完整安装说明请参考[安装教程](../installation.md)。安装完成后，即可在本地使用命令行体验或 Python 集成。
 
 **请注意，如果在执行过程中遇到程序失去响应、程序异常退出、内存资源耗尽、推理速度极慢等问题，请尝试参考文档调整配置，例如关闭不需要使用的功能或使用更轻量的模型。**
 
 ### 2.0 环境准备
 
-#### 2.0.1 基础安装
+#### 2.0.1 安装推理引擎
+
+- 如需使用本地推理引擎 `paddle_static`，请参考[飞桨框架安装说明](../paddlepaddle_installation.md)安装 PaddlePaddle。
+- 如需使用 `transformers` 推理引擎，请参考[推理引擎文档](../inference_engine.md)安装相关依赖。
+
+#### 2.0.2 安装 paddleocr
 
 ```bash
 # 安装基础版本（仅包含OCR功能）
@@ -718,21 +724,25 @@ pip install paddleocr
 pip install "paddleocr[all]"
 ```
 
-#### 2.0.2 环境验证
+#### 2.0.3 环境验证
 
 ```python
 # 验证安装是否成功
 import paddleocr
 print(f"PaddleOCR版本: {paddleocr.__version__}")
 
-# 验证GPU是否可用
+# 若使用本地推理引擎 paddle_static，可继续验证 PaddlePaddle 与 GPU 是否可用
 import paddle
 print(f"Paddle版本: {paddle.__version__}")
 print(f"GPU可用: {paddle.is_compiled_with_cuda()}")
 print(f"GPU数量: {paddle.device.cuda.device_count()}")
+
+# 若使用 transformers 推理引擎，可继续验证 transformers 依赖是否可用
+import transformers
+print(f"Transformers版本: {transformers.__version__}")
 ```
 
-#### 2.0.3 常见安装问题解决
+#### 2.0.4 常见安装问题解决
 
 **问题1：依赖冲突**
 ```bash
@@ -747,7 +757,7 @@ pip install paddleocr
 # 检查CUDA版本
 nvidia-smi
 
-# 安装对应版本的PaddlePaddle
+# 使用本地推理引擎 paddle_static 时，安装对应版本的 PaddlePaddle
 pip install paddlepaddle-gpu==3.0.0 -f https://www.paddlepaddle.org.cn/whl/linux/mkl/avx/stable.html
 ```
 
@@ -774,6 +784,23 @@ paddleocr ocr -i https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_im
 # 通过 --ocr_version 指定 PP-OCR 其他版本
 paddleocr ocr -i ./general_ocr_002.png --ocr_version PP-OCRv4
 ```
+
+上述命令默认使用本地推理引擎 `paddle_static`。如需运行，请先参考[飞桨框架安装说明](../paddlepaddle_installation.md)安装 PaddlePaddle。
+
+如果选择 `transformers` 作为推理引擎，请先参考[推理引擎文档](../inference_engine.md)完成 Transformers 环境配置，然后执行如下命令：
+
+```bash
+# 使用 transformers 引擎进行推理
+paddleocr ocr -i https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_ocr_002.png \
+    --use_doc_orientation_classify False \
+    --use_doc_unwarping False \
+    --use_textline_orientation False \
+    --save_path ./output \
+    --device gpu:0 \
+    --engine transformers
+```
+
+在大多数场景下，默认的 `paddle_static` 推理引擎通常具备更好的推理性能，建议优先使用。
 
 <!-- Luxorion-12修改：表格参数描述 -->
 
@@ -997,30 +1024,38 @@ paddleocr ocr -i ./general_ocr_002.png --ocr_version PP-OCRv4
 <td></td>
 </tr>
 <tr>
+<td><code>engine</code></td>
+<td><b>含义：</b>推理引擎。<br><b>说明：</b>支持 <code>None</code>（默认值）、<code>paddle</code>、<code>paddle_static</code>、<code>paddle_dynamic</code>、<code>transformers</code>。保持为默认值 <code>None</code> 时，PaddleOCR 保留旧版本的行为，在大多数配置下等价于 <code>paddle</code>。详细说明、取值、兼容性规则与示例请参见 <a href="../inference_engine.md">推理引擎与配置说明</a>。</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>enable_hpi</code></td>
-<td><b>含义：</b>是否启用高性能推理。
-<br><b>说明：</b>如果不设置，将使用默认值<code>False</code>。</br></td>
+<td><b>含义：</b>是否启用高性能推理。</td>
 <td><code>bool</code></td>
-<td><code>False</code></td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_tensorrt</code></td>
-<td><b>含义：</b>是否启用 Paddle Inference 的 TensorRT 子图引擎。<br/><b>说明：</b>如果模型不支持通过 TensorRT 加速，即使设置了此标志，也不会使用加速。<br/>
+<td><b>含义：</b>是否启用 Paddle Inference 的 TensorRT 子图引擎。<br/>
+<b>说明：</b>
+如果模型不支持通过 TensorRT 加速，即使设置了此标志，也不会使用加速。<br/>
 对于 CUDA 11.8 版本的飞桨，兼容的 TensorRT 版本为 8.x（x>=6），建议安装 TensorRT 8.6.1.6。<br/>
-
 </td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
 </tr>
 <tr>
 <td><code>precision</code></td>
-<td><b>含义：</b>计算精度，如 fp32、fp16。<br/><b>说明：</b>如果不设置，将使用默认值<code>fp32</code>。</br></td>
+<td><b>含义：</b>计算精度，如 <code>fp32</code>、<code>fp16</code>。</td>
 <td><code>str</code></td>
 <td><code>fp32</code></td>
 </tr>
 <tr>
 <td><code>enable_mkldnn</code></td>
-<td><b>含义：</b>是否启用 MKL-DNN 加速推理。<br/><b>说明：</b>如果 MKL-DNN 不可用或模型不支持通过 MKL-DNN 加速，即使设置了此标志，也不会使用加速。<br/>
+<td><b>含义：</b>是否启用 MKL-DNN 加速推理。<br/>
+<b>说明：</b>
+如果 MKL-DNN 不可用或模型不支持通过 MKL-DNN 加速，即使设置了此标志，也不会使用加速。
 </td>
 <td><code>bool</code></td>
 <td><code>True</code></td>
@@ -1028,15 +1063,16 @@ paddleocr ocr -i ./general_ocr_002.png --ocr_version PP-OCRv4
 <tr>
 <td><code>mkldnn_cache_capacity</code></td>
 <td>
-<b>含义：</b>MKL-DNN 缓存容量。<br/><b>说明：</b>如果不设置，将使用默认值<code>10</code>。</br></td>
+<b>含义：</b>MKL-DNN 缓存容量。
+</td>
 <td><code>int</code></td>
 <td><code>10</code></td>
 </tr>
 <tr>
 <td><code>cpu_threads</code></td>
-<td><b>含义：</b>在 CPU 上进行推理时使用的线程数。<br/><b>说明：</b>如果不设置，将使用默认值<code>8</code>。</br></td>
+<td><b>含义：</b>在 CPU 上进行推理时使用的线程数。</td>
 <td><code>int</code></td>
-<td><code>8</code></td>
+<td><code>10</code></td>
 </tr>
 <tr>
 <td><code>paddlex_config</code></td>
@@ -1044,6 +1080,7 @@ paddleocr ocr -i ./general_ocr_002.png --ocr_version PP-OCRv4
 <td><code>str</code></td>
 <td></td>
 </tr>
+
 </tbody>
 </table>
 <b>以下参数在2.x版本已经废弃，为方便之前版本使用者故列出</b>
@@ -1188,6 +1225,39 @@ for res in result:
     res.save_to_img("output")
     res.save_to_json("output")
 ```
+
+上述代码默认使用本地推理引擎 `paddle_static`。如需运行，请先参考[飞桨框架安装说明](../paddlepaddle_installation.md)安装 PaddlePaddle。
+
+如果选择 `transformers` 作为推理引擎，请先参考[推理引擎文档](../inference_engine.md)完成 Transformers 环境配置，然后执行如下代码：
+
+```python
+from paddleocr import PaddleOCR
+
+ocr = PaddleOCR(
+    use_doc_orientation_classify=False, # 通过 use_doc_orientation_classify 参数指定不使用文档方向分类模型
+    use_doc_unwarping=False, # 通过 use_doc_unwarping 参数指定不使用文本图像矫正模型
+    use_textline_orientation=False, # 通过 use_textline_orientation 参数指定不使用文本行方向分类模型
+    engine="transformers",
+)
+# ocr = PaddleOCR(lang="en", engine="transformers") # 通过 lang 参数来使用英文模型
+# ocr = PaddleOCR(ocr_version="PP-OCRv4") # 通过 ocr_version 参数来使用 PP-OCR 其他版本
+# ocr = PaddleOCR(device="gpu", engine="transformers") # 通过 device 参数使得在模型推理时使用 GPU
+# ocr = PaddleOCR(
+#     text_detection_model_name="PP-OCRv5_server_det",
+#     text_recognition_model_name="PP-OCRv5_server_rec",
+#     use_doc_orientation_classify=False,
+#     use_doc_unwarping=False,
+#     use_textline_orientation=False,
+#     engine="transformers",
+# ) # 更换 PP-OCRv5_server 模型
+result = ocr.predict("./general_ocr_002.png")
+for res in result:
+    res.print()
+    res.save_to_img("output")
+    res.save_to_json("output")
+```
+
+在大多数场景下，默认的 `paddle_static` 推理引擎通常具备更好的推理性能，建议优先使用。
 <!-- Luxorion-12 修改：表格参数说明-->
 在上述 Python 脚本中，执行了如下几个步骤：
 
@@ -1356,7 +1426,7 @@ for res in result:
 </br></tr>
 <tr>
 <td><code>text_det_unclip_ratio</code></td>
-<td><b></b>含义：</b>文本检测扩张系数，使用该方法对文字区域进行扩张，该值越大，扩张的面积越大。
+<td><b>含义：</b>文本检测扩张系数，使用该方法对文字区域进行扩张，该值越大，扩张的面积越大。
 <br><b>说明：</b>
 <ul>
 <li><b>float</b>：大于<code>0</code>的任意浮点数；
@@ -1433,10 +1503,22 @@ for res in result:
 <td><code>None</code></td>
 </tr>
 <tr>
+<td><code>engine</code></td>
+<td><b>含义：</b>推理引擎。<br><b>说明：</b>支持 <code>None</code>（默认值）、<code>paddle</code>、<code>paddle_static</code>、<code>paddle_dynamic</code>、<code>transformers</code>。保持为默认值 <code>None</code> 时，PaddleOCR 保留旧版本的行为，在大多数配置下等价于 <code>paddle</code>。详细说明、取值、兼容性规则与示例请参见 <a href="../inference_engine.md">推理引擎与配置说明</a>。</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine_config</code></td>
+<td><b>含义：</b>推理引擎配置。<br><b>说明：</b>推荐与 <code>engine</code> 搭配使用。详细字段、兼容性规则与示例请参见 <a href="../inference_engine.md">推理引擎与配置说明</a>。</td>
+<td><code>dict|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>enable_hpi</code></td>
 <td><b>含义：</b>是否启用高性能推理。</td>
 <td><code>bool</code></td>
-<td><code>False</code></td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_tensorrt</code></td>
@@ -1450,7 +1532,7 @@ for res in result:
 </tr>
 <tr>
 <td><code>precision</code></td>
-<td><b>含义：</b>计算精度，如 fp32、fp16。</td>
+<td><b>含义：</b>计算精度，如 <code>"fp32"</code>、<code>"fp16"</code>。</td>
 <td><code>str</code></td>
 <td><code>"fp32"</code></td>
 </tr>
@@ -1473,7 +1555,7 @@ for res in result:
 <td><code>cpu_threads</code></td>
 <td><b>含义：</b>在 CPU 上进行推理时使用的线程数。</td>
 <td><code>int</code></td>
-<td><code>8</code></td>
+<td><code>10</code></td>
 </tr>
 <tr>
 <td><code>paddlex_config</code></td>

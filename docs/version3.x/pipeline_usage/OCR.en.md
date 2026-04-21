@@ -23,6 +23,7 @@ The general OCR pipeline is used to solve text recognition tasks by extracting t
 In this pipeline, you can select models based on the benchmark test data provided below.
 
 > The inference time only includes the model inference time and does not include the time for pre- or post-processing.
+> In the inference time columns labeled [Standard Mode / High-Performance Mode], the Standard Mode values correspond to the local `paddle_static` inference engine.
 
 <details>
 <summary><b>Document Image Orientation Classification Module (Optional):</b></summary>
@@ -656,7 +657,7 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">Inference Model</a>/<a href="https://p
               <li><strong>Software Environment:</strong>
                   <ul>
                       <li>Ubuntu 20.04 / CUDA 11.8 / cuDNN 8.9 / TensorRT 8.6.1.6</li>
-                      <li>paddlepaddle 3.0.0 / paddleocr 3.0.3</li>
+                      <li>paddlepaddle-gpu 3.0.0 / paddleocr 3.0.3</li>
                   </ul>
               </li>
           </ul>
@@ -678,7 +679,7 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">Inference Model</a>/<a href="https://p
            <td>Standard Mode</td>
            <td>FP32 Precision / No TRT Acceleration</td>
            <td>FP32 Precision / 8 Threads</td>
-           <td>PaddleInference</td>
+           <td><code>paddle_static</code></td>
        </tr>
        <tr>
            <td>High-Performance Mode</td>
@@ -696,26 +697,80 @@ devanagari_PP-OCRv3_mobile_rec_infer.tar">Inference Model</a>/<a href="https://p
 
 ## 2. Quick Start  
 
-Before using the general OCR pipeline locally, ensure you have installed the wheel package by following the [Installation Guide](../installation.en.md). Once installed, you can experience OCR via the command line or Python integration.  
+Before using the general OCR pipeline locally, install the dependencies for your chosen inference engine first, then install the `paddleocr` package. See the [Installation Guide](../installation.en.md) for the full procedure. After installation, you can use the command line or Python integration.
 
+### 2.0 Environment Preparation
+
+#### 2.0.1 Install the inference engine
+
+- If you use the local `paddle_static` inference engine, install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+- If you use the `transformers` inference engine, install the required dependencies by following [Inference Engine and Configuration](../inference_engine.en.md).
+
+#### 2.0.2 Install paddleocr
+
+```bash
+# Install the basic package (OCR only)
+pip install paddleocr
+
+# Install the full package (all features)
+pip install "paddleocr[all]"
+```
+
+#### 2.0.3 Environment Verification
+
+```python
+# Verify that PaddleOCR is installed successfully
+import paddleocr
+print(f"PaddleOCR version: {paddleocr.__version__}")
+
+# If you use the local paddle_static inference engine, you can further verify PaddlePaddle and GPU availability
+import paddle
+print(f"Paddle version: {paddle.__version__}")
+print(f"GPU available: {paddle.is_compiled_with_cuda()}")
+print(f"GPU count: {paddle.device.cuda.device_count()}")
+
+# If you use the transformers inference engine, you can further verify the transformers dependency
+import transformers
+print(f"Transformers version: {transformers.__version__}")
+```
+
+#### 2.0.4 Common Installation Issues
 Please note: If you encounter issues such as the program becoming unresponsive, unexpected program termination, running out of memory resources, or extremely slow inference during execution, please try adjusting the configuration according to the documentation, such as disabling unnecessary features or using lighter-weight models.
 
 ### 2.1 Command Line  
 
 Run a single command to quickly test the OCR pipeline.  Before running the code below, please download the [example image](https://paddle-model-ecology.bj.bcebos.com/paddlex/demo_image/pipelines/general_formula_recognition_001.png) locally:  
 
-```bash  
-# Default: Uses PP-OCRv5 model  
+```bash
+# Default: Uses PP-OCRv5 model
 paddleocr ocr -i https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_ocr_002.png \
     --use_doc_orientation_classify False \
     --use_doc_unwarping False \
     --use_textline_orientation False \
     --save_path ./output \
-    --device gpu:0 
+    --device gpu:0
 
 # Use PP-OCRv4 model by --ocr_version PP-OCRv4
 paddleocr ocr -i ./general_ocr_002.png --ocr_version PP-OCRv4
-```  
+
+```
+
+The examples above use the local `paddle_static` inference engine by default. To run them, first install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+
+If you choose `transformers` as the inference engine, make sure the Transformers environment is configured by following [Inference Engine and Configuration](../inference_engine.en.md), and then run the following command:
+
+```bash
+# Use the transformers engine for inference
+paddleocr ocr -i https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_ocr_002.png \
+    --use_doc_orientation_classify False \
+    --use_doc_unwarping False \
+    --use_textline_orientation False \
+    --save_path ./output \
+    --device gpu:0 \
+    --engine transformers
+```
+
+In most scenarios, the default `paddle_static` inference engine delivers better inference performance and is the recommended first choice.
 
 <details><summary><b>Command line supports more parameter settings. Click to expand for detailed instructions on command line parameters.</b></summary>
 <table>
@@ -984,33 +1039,38 @@ Supports specifying a specific card number:
 <td></td>
 </tr>
 <tr>
+<td><code>engine</code></td>
+<td><b>Meaning:</b> Inference engine.<br/><b>Description:</b> Supports <code>None</code> (the default), <code>paddle</code>, <code>paddle_static</code>, <code>paddle_dynamic</code>, and <code>transformers</code>. When left as <code>None</code>, PaddleOCR preserves the behavior of earlier versions, which in most configurations is equivalent to <code>paddle</code>. For detailed descriptions, supported values, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>enable_hpi</code></td>
-<td><b>Meaning:</b>Whether to enable high-performance inference.</td>
+<td><b>Meaning:</b> Whether to enable high-performance inference.</td>
 <td><code>bool</code></td>
-<td><code>False</code></td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_tensorrt</code></td>
-<td><b>Meaning:</b>Whether to use the Paddle Inference TensorRT subgraph engine. <br/>
+<td><b>Meaning:</b> Whether to enable the TensorRT subgraph engine of Paddle Inference.<br/>
 <b>Description:</b>
-If the model does not support acceleration through TensorRT, setting this flag will not enable acceleration.<br/>
-For Paddle with CUDA version 11.8, the compatible TensorRT version is 8.x (x>=6), and it is recommended to install TensorRT 8.6.1.6.<br/>
-
+If the model does not support TensorRT acceleration, acceleration will not be used even if this flag is set.<br/>
+For CUDA 11.8 versions of PaddlePaddle, the compatible TensorRT version is 8.x (x>=6). TensorRT 8.6.1.6 is recommended.<br/>
 </td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
 </tr>
 <tr>
 <td><code>precision</code></td>
-<td><b>Meaning:</b>Computational precision, such as fp32, fp16.</td>
+<td><b>Meaning:</b> Computation precision, such as <code>fp32</code> or <code>fp16</code>.</td>
 <td><code>str</code></td>
 <td><code>fp32</code></td>
 </tr>
 <tr>
 <td><code>enable_mkldnn</code></td>
-<td><b>Meaning:</b>Whether to enable MKL-DNN acceleration for inference. <br/>
+<td><b>Meaning:</b> Whether to enable MKL-DNN accelerated inference.<br/>
 <b>Description:</b>
-If MKL-DNN is unavailable or the model does not support it, acceleration will not be used even if this flag is set.
+If MKL-DNN is unavailable or the model does not support MKL-DNN acceleration, acceleration will not be used even if this flag is set.
 </td>
 <td><code>bool</code></td>
 <td><code>True</code></td>
@@ -1018,20 +1078,20 @@ If MKL-DNN is unavailable or the model does not support it, acceleration will no
 <tr>
 <td><code>mkldnn_cache_capacity</code></td>
 <td>
-<b>Meaning:</b>MKL-DNN cache capacity.
+<b>Meaning:</b> MKL-DNN cache capacity.
 </td>
 <td><code>int</code></td>
 <td><code>10</code></td>
 </tr>
 <tr>
 <td><code>cpu_threads</code></td>
-<td><b>Meaning:</b>Number of threads used for inference on CPU.</td>
+<td><b>Meaning:</b> Number of threads used for inference on CPU.</td>
 <td><code>int</code></td>
-<td><code>8</code></td>
+<td><code>10</code></td>
 </tr>
 <tr>
 <td><code>paddlex_config</code></td>
-<td><b>Meaning:</b>Path to the PaddleX pipeline configuration file.</td>
+<td><b>Meaning:</b> Path to the PaddleX pipeline configuration file.</td>
 <td><code>str</code></td>
 <td></td>
 </tr>
@@ -1292,6 +1352,30 @@ If set to <code>None</code>, the default batch size will be <code>1</code>.</td>
 <td><code>None</code></td>
 </tr>
 <tr>
+<td><code>text_recognition_model_name</code></td>
+<td><b>Meaning:</b>Name of the text recognition model. <br/>
+<b>Description:</b>
+If set to <code>None</code>, the pipeline's default model will be used.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>text_recognition_model_dir</code></td>
+<td><b>Meaning:</b>Directory path of the text recognition model. <br/>
+<b>Description:</b>
+If set to <code>None</code>, the official model will be downloaded.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>text_recognition_batch_size</code></td>
+<td><b>Meaning:</b>Batch size for the text recognition model. <br/>
+<b>Description:</b>
+If set to <code>None</code>, the default batch size will be <code>1</code>.</td>
+<td><code>int|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>use_doc_orientation_classify</code></td>
 <td><b>Meaning:</b>Whether to load and use the document orientation classification module. <br/>
 <b>Description:</b>
@@ -1309,7 +1393,7 @@ If set to <code>None</code>, the pipeline's initialized value for this parameter
 </tr>
 <tr>
 <td><code>use_textline_orientation</code></td>
-<td><b></b>Meaning:</b>Whether to load and use the text line orientation module. <br/>
+<td><b>Meaning:</b>Whether to load and use the text line orientation module. <br/>
 <b>Description:</b>
 If set to <code>None</code>, the pipeline's initialized value for this parameter (defaults to <code>True</code>) will be used.</td>
 <td><code>bool|None</code></td>
@@ -1439,10 +1523,22 @@ Supports specifying a specific card number:
 <td><code>None</code></td>
 </tr>
 <tr>
+<td><code>engine</code></td>
+<td><b>Meaning:</b> Inference engine.<br/><b>Description:</b> Supports <code>None</code> (the default), <code>paddle</code>, <code>paddle_static</code>, <code>paddle_dynamic</code>, and <code>transformers</code>. When left as <code>None</code>, PaddleOCR preserves the behavior of earlier versions, which in most configurations is equivalent to <code>paddle</code>. For detailed descriptions, supported values, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>str|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
+<td><code>engine_config</code></td>
+<td><b>Meaning:</b> Inference-engine configuration.<br/><b>Description:</b> Recommended together with <code>engine</code>. For supported fields, compatibility rules, and examples, see <a href="../inference_engine.en.md">Inference Engine and Configuration</a>.</td>
+<td><code>dict|None</code></td>
+<td><code>None</code></td>
+</tr>
+<tr>
 <td><code>enable_hpi</code></td>
 <td><b>Meaning:</b>Whether to enable high-performance inference.</td>
 <td><code>bool</code></td>
-<td><code>False</code></td>
+<td><code>None</code></td>
 </tr>
 <tr>
 <td><code>use_tensorrt</code></td>
@@ -1456,7 +1552,7 @@ For Paddle with CUDA version 11.8, the compatible TensorRT version is 8.x (x>=6)
 </tr>
 <tr>
 <td><code>precision</code></td>
-<td><b>Meaning:</b>Computational precision, such as fp32, fp16.</td>
+<td><b>Meaning:</b>Computational precision, such as <code>"fp32"</code>, <code>"fp16"</code>.</td>
 <td><code>str</code></td>
 <td><code>"fp32"</code></td>
 </tr>
@@ -1480,7 +1576,7 @@ If MKL-DNN is unavailable or the model does not support it, acceleration will no
 <td><code>cpu_threads</code></td>
 <td><b>Meaning:</b>Number of threads used for CPU inference.</td>
 <td><code>int</code></td>
-<td><code>8</code></td>
+<td><code>10</code></td>
 </tr>
 <tr>
 <td><code>paddlex_config</code></td>
@@ -2448,6 +2544,39 @@ pipeline = PaddleOCR(text_detection_model_dir="./your_det_model_path")
 # pipeline = PaddleOCR(text_detection_model_name="PP-OCRv5_mobile_det", text_detection_model_dir="./your_v5_mobile_det_model_path")
 
 ```
+
+The example above uses the local `paddle_static` inference engine by default. To run it, first install PaddlePaddle by following [PaddlePaddle Framework Installation](../paddlepaddle_installation.en.md).
+
+If you choose `transformers` as the inference engine, make sure the Transformers environment is configured by following [Inference Engine and Configuration](../inference_engine.en.md), and then run the following code:
+
+```python
+from paddleocr import PaddleOCR
+
+ocr = PaddleOCR(
+    use_doc_orientation_classify=False, # Disable document orientation classification
+    use_doc_unwarping=False, # Disable document unwarping
+    use_textline_orientation=False, # Disable textline orientation classification
+    engine="transformers",
+)
+# ocr = PaddleOCR(lang="en", engine="transformers") # Use the English model
+# ocr = PaddleOCR(ocr_version="PP-OCRv4", engine="transformers") # Use another PP-OCR version
+# ocr = PaddleOCR(device="gpu", engine="transformers") # Use GPU for inference
+# ocr = PaddleOCR(
+#     text_detection_model_name="PP-OCRv5_server_det",
+#     text_recognition_model_name="PP-OCRv5_server_rec",
+#     use_doc_orientation_classify=False,
+#     use_doc_unwarping=False,
+#     use_textline_orientation=False,
+#     engine="transformers",
+# ) # Switch to the PP-OCRv5_server models
+result = ocr.predict("./general_ocr_002.png")
+for res in result:
+    res.print()
+    res.save_to_img("output")
+    res.save_to_json("output")
+```
+
+In most scenarios, the default `paddle_static` inference engine delivers better inference performance and is the recommended first choice.
 
 #### 4.2.2 Specify the local model path through the configuration file
 

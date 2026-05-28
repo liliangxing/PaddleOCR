@@ -3290,6 +3290,7 @@ For visualized result images and images included in Markdown, the service return
 
 ```yaml
 Serving:
+  return_urls: True
   extra:
     file_storage:
       type: bos
@@ -3298,7 +3299,6 @@ Serving:
       ak: xxx
       sk: xxx
       key_prefix: deploy
-    return_img_urls: True
     url_expires_in: 3600
 ```
 

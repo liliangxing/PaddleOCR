@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -27,6 +28,7 @@ PP_STRUCTUREV3_RUNTIME_PARAMS: dict[str, type] = {
     "layout_nms": bool,
     "layout_unclip_ratio": float,
     "layout_merge_bboxes_mode": int,
+    "format_block_content": bool,
     "text_det_limit_side_len": int,
     "text_det_limit_type": str,
     "text_det_thresh": float,
@@ -45,6 +47,7 @@ PP_STRUCTUREV3_RUNTIME_PARAMS: dict[str, type] = {
     "use_ocr_results_with_table_cells": bool,
     "use_e2e_wired_table_rec_model": bool,
     "use_e2e_wireless_table_rec_model": bool,
+    "markdown_ignore_labels": list,
 }
 
 PP_STRUCTUREV3_DEFAULT_PARAMS: dict[str, Any] = {

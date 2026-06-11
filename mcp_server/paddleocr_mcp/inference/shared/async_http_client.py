@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -20,16 +21,22 @@ class AsyncHTTPClient:
     def __init__(
         self,
         base_url: str,
-        timeout: int = 60,
+        http_timeout: int = 600,
         headers: Optional[dict[str, str]] = None,
     ):
         self._base_url = base_url
-        self._timeout = timeout
+        self._http_timeout = http_timeout
         self._headers = headers or {}
         self._client: Optional[httpx.AsyncClient] = None
 
     async def start(self) -> None:
-        timeout = httpx.Timeout(connect=30.0, read=self._timeout, write=30.0, pool=30.0)
+        write_timeout = min(float(self._http_timeout), 120.0)
+        timeout = httpx.Timeout(
+            connect=30.0,
+            read=float(self._http_timeout),
+            write=write_timeout,
+            pool=30.0,
+        )
         self._client = httpx.AsyncClient(timeout=timeout)
 
     async def stop(self) -> None:

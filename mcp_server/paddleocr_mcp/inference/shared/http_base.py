@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -11,35 +12,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import base64
 from abc import abstractmethod
-from pathlib import Path
 from typing import Any, Optional
+
+import httpx
 
 from ..base import Inference
 from ..errors import InferenceError
 from ..types import InferenceRequest, InferenceResult
 from .async_http_client import AsyncHTTPClient
+from .input_adapters import HTTPInputAdapter, InputAdapter
 from .param_mapping import convert_params_to_camel
+from ...providers import InferenceProvider
 
 
 class HTTPInferenceBase(Inference):
     def __init__(
         self,
         base_url: str,
-        timeout: int = 60,
+        http_timeout: int = 600,
         api_key: Optional[str] = None,
+        provider: InferenceProvider | str = InferenceProvider.SELF_HOSTED,
     ):
         self._base_url = base_url
-        self._timeout = timeout
+        self._http_timeout = http_timeout
         self._api_key = api_key
+        self._input_adapter = HTTPInputAdapter(provider)
         self._client: Optional[AsyncHTTPClient] = None
+
+    @property
+    def input_adapter(self) -> InputAdapter:
+        return self._input_adapter
 
     async def start(self) -> None:
         headers = {}
         if self._api_key:
             headers["Authorization"] = f"Bearer {self._api_key}"
-        self._client = AsyncHTTPClient(self._base_url, self._timeout, headers)
+        self._client = AsyncHTTPClient(self._base_url, self._http_timeout, headers)
         await self._client.start()
 
     async def stop(self) -> None:
@@ -57,27 +66,34 @@ class HTTPInferenceBase(Inference):
             **request.runtime_params,
         )
 
+        endpoint = self._get_endpoint()
+        provider = self._input_adapter.provider.value
         try:
-            response = await self._client.post(self._get_endpoint(), payload)
+            response = await self._client.post(endpoint, payload)
             return self._parse_result(response)
+        except httpx.ReadTimeout as e:
+            raise InferenceError(
+                f"HTTP read timeout after {self._http_timeout}s "
+                f"({provider}/{endpoint}): {e}"
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise InferenceError(
+                f"HTTP {e.response.status_code} ({provider}/{endpoint}): {e}"
+            ) from e
+        except httpx.HTTPError as e:
+            raise InferenceError(f"HTTP error ({provider}/{endpoint}): {e}") from e
         except Exception as e:
-            raise InferenceError(f"HTTP request failed: {e}") from e
-
-    def _encode_file_field(self, input_data: str) -> str:
-        """Encode local paths to Base64; pass through URLs and raw payloads."""
-        if input_data.startswith("http://") or input_data.startswith("https://"):
-            return input_data
-        from .local_input import LocalInputProcessor
-
-        if LocalInputProcessor.is_file_path(input_data):
-            path = Path(input_data).expanduser()
-            return base64.b64encode(path.read_bytes()).decode("ascii")
-        return input_data
+            raise InferenceError(
+                f"HTTP request failed ({provider}/{endpoint}): {e}"
+            ) from e
 
     def _prepare_payload(
         self, input_data: str, file_type: Optional[str], **params
     ) -> dict[str, Any]:
-        payload: dict[str, Any] = {"file": self._encode_file_field(input_data)}
+        http_adapter = self._input_adapter
+        payload: dict[str, Any] = {
+            "file": http_adapter.prepare_http_file_field(input_data)
+        }
         if file_type == "image":
             payload["fileType"] = 1
         elif file_type == "pdf":

@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -179,3 +180,8 @@ RequestTimeoutError = _SDK.RequestTimeoutError
 ResponseFormatError = _SDK.ResponseFormatError
 ResultParseError = _SDK.ResultParseError
 ServiceUnavailableError = _SDK.ServiceUnavailableError
+
+from paddleocr._api_client._core import (  # noqa: E402
+    resolve_document_model,
+    resolve_ocr_model,
+)

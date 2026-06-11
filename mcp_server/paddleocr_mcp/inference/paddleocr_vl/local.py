@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -15,8 +16,8 @@ from typing import Any, Optional
 
 from ..base import Inference
 from ..shared.doc_parsing_result_adapters import parse_local_doc_parsing_result
+from ..shared.input_adapters import LOCAL_INPUT_ADAPTER, InputAdapter
 from ..shared.local_sync_runner import LocalSyncRunner
-from ..shared.local_input import LocalInputProcessor
 from ..types import DocParsingResult, InferenceRequest
 from .params import PADDLEOCR_VL_DEFAULT_PARAMS, PADDLEOCR_VL_RUNTIME_PARAMS
 
@@ -27,26 +28,37 @@ try:
 except ImportError:
     LOCAL_VL_AVAILABLE = False
 
+_PIPELINE_VERSION_BY_MODEL = {
+    "PaddleOCR-VL": "v1",
+    "PaddleOCR-VL-1.5": "v1.5",
+    "PaddleOCR-VL-1.6": "v1.6",
+}
+
 
 class PaddleOCRVLLocalInference(Inference):
     def __init__(
         self,
         config: Optional[str] = None,
         device: Optional[str] = None,
-        version: str = "v1",
+        model: str = "PaddleOCR-VL",
     ):
         self._config = config
         self._device = device
-        self._version = version
+        self._model = model
         self._inference: Optional[Any] = None
         self._wrapper: Optional[LocalSyncRunner] = None
+
+    @property
+    def input_adapter(self) -> InputAdapter:
+        return LOCAL_INPUT_ADAPTER
 
     async def start(self) -> None:
         if not LOCAL_VL_AVAILABLE:
             raise RuntimeError("PaddleOCRVL is not locally available")
         try:
+            pipeline_version = _PIPELINE_VERSION_BY_MODEL[self._model]
             self._inference = PaddleOCRVL(
-                pipeline_version=self._version,
+                pipeline_version=pipeline_version,
                 paddlex_config=self._config,
                 device=self._device,
             )
@@ -65,11 +77,12 @@ class PaddleOCRVLLocalInference(Inference):
         if not self._wrapper:
             raise RuntimeError("Inference not started")
 
-        processed_input = LocalInputProcessor.process_for_local(request.input_data)
-
-        result = await self._wrapper.call(
-            self._wrapper.inference.predict, processed_input, **request.runtime_params
-        )
+        with self.input_adapter.prepare(request.input_data) as processed_input:
+            result = await self._wrapper.call(
+                self._wrapper.inference.predict,
+                processed_input,
+                **request.runtime_params,
+            )
 
         return self._parse_result(result)
 

@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -24,6 +25,7 @@ from ..shared.paddleocr_api_sdk import (
     ServiceUnavailableError,
     Model,
     OCROptions,
+    resolve_ocr_model,
 )
 
 from ..base import Inference
@@ -33,6 +35,7 @@ from ..errors import (
     InferenceError,
     ResourceUnavailableError,
 )
+from ..shared.input_adapters import AISTUDIO_INPUT_ADAPTER, InputAdapter
 from ..types import InferenceRequest, OCRResult, TextLine
 from .params import OCR_DEFAULT_PARAMS, OCR_RUNTIME_PARAMS
 
@@ -42,14 +45,20 @@ class OCRAIStudioInference(Inference):
         self,
         token: str,
         base_url: Optional[str] = None,
-        request_timeout: float = 300.0,
+        request_timeout: float = 120.0,
         poll_timeout: float = 600.0,
+        model: str = Model.PP_OCRV5.value,
     ):
         self._token = token
         self._base_url = base_url
         self._request_timeout = request_timeout
         self._poll_timeout = poll_timeout
+        self._model = resolve_ocr_model(model)
         self._client = None
+
+    @property
+    def input_adapter(self) -> InputAdapter:
+        return AISTUDIO_INPUT_ADAPTER
 
     async def start(self) -> None:
         try:
@@ -72,12 +81,12 @@ class OCRAIStudioInference(Inference):
             raise RuntimeError("Inference not started")
 
         try:
-            input_source = self._resolve_input_source(request.input_data)
-            options = OCROptions(**request.runtime_params, visualize=False)
+            with self.input_adapter.prepare(request.input_data) as input_payload:
+                options = OCROptions(**request.runtime_params, visualize=False)
 
-            result = await self._client.ocr(
-                model=Model.PP_OCRV5, **input_source, options=options
-            )
+                result = await self._client.ocr(
+                    model=self._model, **input_payload, options=options
+                )
 
             return self._parse_result(result)
 
@@ -95,11 +104,6 @@ class OCRAIStudioInference(Inference):
 
     def get_default_params(self) -> dict[str, object]:
         return OCR_DEFAULT_PARAMS.copy()
-
-    def _resolve_input_source(self, input_data: str) -> dict[str, str]:
-        if input_data.startswith("http://") or input_data.startswith("https://"):
-            return {"file_url": input_data}
-        return {"file_path": input_data}
 
     def _parse_result(self, result) -> OCRResult:
         clean_texts, confidences, text_lines = [], [], []

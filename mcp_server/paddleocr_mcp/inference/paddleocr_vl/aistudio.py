@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -24,6 +25,7 @@ from ..shared.paddleocr_api_sdk import (
     ServiceUnavailableError,
     Model,
     PaddleOCRVLOptions,
+    resolve_document_model,
 )
 
 from ..base import Inference
@@ -34,31 +36,30 @@ from ..errors import (
     ResourceUnavailableError,
 )
 from ..shared.doc_parsing_result_adapters import parse_aistudio_doc_parsing_result
+from ..shared.input_adapters import AISTUDIO_INPUT_ADAPTER, InputAdapter
 from ..types import DocParsingResult, InferenceRequest
 from .params import PADDLEOCR_VL_DEFAULT_PARAMS, PADDLEOCR_VL_RUNTIME_PARAMS
 
 
 class PaddleOCRVLAIStudioInference(Inference):
-    _MODEL_MAP = {
-        "v1": Model.PADDLE_OCR_VL,
-        "v1.5": Model.PADDLE_OCR_VL_15,
-        "v1.6": Model.PADDLE_OCR_VL_16,
-    }
-
     def __init__(
         self,
         token: str,
         base_url: Optional[str] = None,
-        request_timeout: float = 300.0,
+        request_timeout: float = 120.0,
         poll_timeout: float = 600.0,
-        version: str = "v1",
+        model: str = Model.PADDLE_OCR_VL.value,
     ):
         self._token = token
         self._base_url = base_url
         self._request_timeout = request_timeout
         self._poll_timeout = poll_timeout
-        self._version = version
+        self._model = resolve_document_model(model)
         self._client = None
+
+    @property
+    def input_adapter(self) -> InputAdapter:
+        return AISTUDIO_INPUT_ADAPTER
 
     async def start(self) -> None:
         try:
@@ -81,13 +82,13 @@ class PaddleOCRVLAIStudioInference(Inference):
             raise RuntimeError("Inference not started")
 
         try:
-            input_source = self._resolve_input_source(request.input_data)
-            options = PaddleOCRVLOptions(**request.runtime_params)
+            with self.input_adapter.prepare(request.input_data) as input_payload:
+                options = PaddleOCRVLOptions(**request.runtime_params)
 
-            model = self._MODEL_MAP[self._version]
-            result = await self._client.parse_document(
-                model=model, **input_source, options=options
-            )
+                model = self._model
+                result = await self._client.parse_document(
+                    model=model, **input_payload, options=options
+                )
 
             return self._parse_result(result)
 
@@ -105,11 +106,6 @@ class PaddleOCRVLAIStudioInference(Inference):
 
     def get_default_params(self) -> dict[str, object]:
         return PADDLEOCR_VL_DEFAULT_PARAMS.copy()
-
-    def _resolve_input_source(self, input_data: str) -> dict[str, str]:
-        if input_data.startswith("http://") or input_data.startswith("https://"):
-            return {"file_url": input_data}
-        return {"file_path": input_data}
 
     def _parse_result(self, result) -> DocParsingResult:
         return parse_aistudio_doc_parsing_result(result)

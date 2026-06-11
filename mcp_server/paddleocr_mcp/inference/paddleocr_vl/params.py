@@ -1,7 +1,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -20,18 +21,23 @@ PADDLEOCR_VL_RUNTIME_PARAMS: dict[str, type] = {
     "use_layout_detection": bool,
     "use_chart_recognition": bool,
     "use_seal_recognition": bool,
+    "use_ocr_for_image_block": bool,
     "layout_threshold": float,
     "layout_nms": bool,
     "layout_unclip_ratio": float,
     "layout_merge_bboxes_mode": int,
     "layout_shape_mode": str,
     "prompt_label": str,
+    "format_block_content": bool,
     "repetition_penalty": float,
     "temperature": float,
     "top_p": float,
     "min_pixels": int,
     "max_pixels": int,
     "max_new_tokens": int,
+    "vlm_extra_args": dict,
+    "merge_layout_blocks": bool,
+    "markdown_ignore_labels": list,
 }
 
 PADDLEOCR_VL_DEFAULT_PARAMS: dict[str, Any] = {

@@ -3,7 +3,8 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
-# you may obtain a copy of the License at
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -23,9 +24,9 @@ import sys
 from fastmcp import FastMCP
 
 from .inference import create_inference
+from .selection import DEFAULT_MODEL, resolve_model
+from .providers import InferenceProvider, provider_choices
 from .tasks import create_task
-
-_QIANFAN_SUPPORTED_PIPELINES = frozenset({"PP-StructureV3", "PaddleOCR-VL"})
 
 
 def _parse_args() -> argparse.Namespace:
@@ -33,22 +34,15 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PaddleOCR MCP server.")
 
     parser.add_argument(
-        "--pipeline",
-        choices=[
-            "OCR",
-            "PP-StructureV3",
-            "PaddleOCR-VL",
-            "PaddleOCR-VL-1.5",
-            "PaddleOCR-VL-1.6",
-        ],
-        default=os.getenv("PADDLEOCR_MCP_PIPELINE", "OCR"),
-        help="Pipeline to run. Env: PADDLEOCR_MCP_PIPELINE.",
+        "--model",
+        default=os.getenv("PADDLEOCR_MCP_MODEL", DEFAULT_MODEL),
+        help="Model to run. Env: PADDLEOCR_MCP_MODEL.",
     )
     parser.add_argument(
         "--ppocr_source",
-        choices=["local", "aistudio", "qianfan", "self_hosted"],
+        choices=provider_choices(),
         default=os.getenv("PADDLEOCR_MCP_PPOCR_SOURCE", "local"),
-        help="Inference backend. Env: PADDLEOCR_MCP_PPOCR_SOURCE.",
+        help="Inference provider. Env: PADDLEOCR_MCP_PPOCR_SOURCE.",
     )
 
     parser.add_argument(
@@ -114,10 +108,34 @@ def _parse_args() -> argparse.Namespace:
         help="Qianfan API key (qianfan). Env: PADDLEOCR_MCP_QIANFAN_API_KEY.",
     )
     parser.add_argument(
-        "--timeout",
+        "--http-timeout",
+        dest="http_timeout",
         type=int,
-        default=int(os.getenv("PADDLEOCR_MCP_TIMEOUT", "60")),
-        help="Request timeout in seconds. Env: PADDLEOCR_MCP_TIMEOUT.",
+        default=int(os.getenv("PADDLEOCR_MCP_HTTP_TIMEOUT", "600")),
+        help=(
+            "HTTP read timeout in seconds for synchronous APIs. "
+            "Env: PADDLEOCR_MCP_HTTP_TIMEOUT."
+        ),
+    )
+    parser.add_argument(
+        "--aistudio-request-timeout",
+        dest="aistudio_request_timeout",
+        type=int,
+        default=int(os.getenv("PADDLEOCR_MCP_AISTUDIO_REQUEST_TIMEOUT", "120")),
+        help=(
+            "Per-request HTTP timeout in seconds for AI Studio API calls. "
+            "Env: PADDLEOCR_MCP_AISTUDIO_REQUEST_TIMEOUT."
+        ),
+    )
+    parser.add_argument(
+        "--aistudio-poll-timeout",
+        dest="aistudio_poll_timeout",
+        type=int,
+        default=int(os.getenv("PADDLEOCR_MCP_AISTUDIO_POLL_TIMEOUT", "600")),
+        help=(
+            "Total job polling timeout in seconds for AI Studio. "
+            "Env: PADDLEOCR_MCP_AISTUDIO_POLL_TIMEOUT."
+        ),
     )
 
     return parser.parse_args()
@@ -132,7 +150,7 @@ def _validate_args(args: argparse.Namespace) -> None:
         )
         sys.exit(2)
 
-    if args.ppocr_source == "aistudio":
+    if args.ppocr_source == InferenceProvider.AISTUDIO.value:
         if not args.aistudio_access_token:
             print("Error: The AI Studio access token is required.", file=sys.stderr)
             print(
@@ -141,15 +159,7 @@ def _validate_args(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(2)
-    elif args.ppocr_source == "qianfan":
-        if args.pipeline not in _QIANFAN_SUPPORTED_PIPELINES:
-            supported = ", ".join(sorted(_QIANFAN_SUPPORTED_PIPELINES))
-            print(
-                f"Error: Pipeline {args.pipeline!r} is not supported with qianfan source. "
-                f"Supported pipelines: {supported}. ",
-                file=sys.stderr,
-            )
-            sys.exit(2)
+    elif args.ppocr_source == InferenceProvider.QIANFAN.value:
         if not args.qianfan_api_key:
             print("Error: The Qianfan API key is required.", file=sys.stderr)
             print(
@@ -158,7 +168,7 @@ def _validate_args(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(2)
-    elif args.ppocr_source == "self_hosted":
+    elif args.ppocr_source == InferenceProvider.SELF_HOSTED.value:
         if not args.self_hosted_base_url:
             print(
                 "Error: The self-hosted service base URL is required.", file=sys.stderr
@@ -171,42 +181,42 @@ def _validate_args(args: argparse.Namespace) -> None:
             sys.exit(2)
 
 
-def _create_inference_from_args(args: argparse.Namespace):
-    source = args.ppocr_source
+def _create_inference_from_args(args: argparse.Namespace, model: str):
+    provider = args.ppocr_source
 
-    if source == "local":
+    if provider == InferenceProvider.LOCAL.value:
         return create_inference(
-            pipeline=args.pipeline,
-            source=source,
+            model=model,
+            provider=provider,
             config=args.pipeline_config,
             device=args.device,
         )
-    elif source == "aistudio":
+    elif provider == InferenceProvider.AISTUDIO.value:
         return create_inference(
-            pipeline=args.pipeline,
-            source=source,
+            model=model,
+            provider=provider,
             token=args.aistudio_access_token,
             base_url=args.aistudio_base_url,
-            request_timeout=float(args.timeout),
-            poll_timeout=float(args.timeout * 10),
+            request_timeout=float(args.aistudio_request_timeout),
+            poll_timeout=float(args.aistudio_poll_timeout),
         )
-    elif source == "qianfan":
+    elif provider == InferenceProvider.QIANFAN.value:
         return create_inference(
-            pipeline=args.pipeline,
-            source=source,
+            model=model,
+            provider=provider,
             base_url=args.qianfan_base_url,
             api_key=args.qianfan_api_key,
-            timeout=args.timeout,
+            http_timeout=args.http_timeout,
         )
-    elif source == "self_hosted":
+    elif provider == InferenceProvider.SELF_HOSTED.value:
         return create_inference(
-            pipeline=args.pipeline,
-            source=source,
+            model=model,
+            provider=provider,
             base_url=args.self_hosted_base_url,
-            timeout=args.timeout,
+            http_timeout=args.http_timeout,
         )
     else:
-        raise ValueError(f"Unknown source: {source}")
+        raise ValueError(f"Unknown provider: {provider}")
 
 
 async def async_main() -> None:
@@ -214,14 +224,20 @@ async def async_main() -> None:
     args = _parse_args()
     _validate_args(args)
 
-    inference = _create_inference_from_args(args)
+    try:
+        model = resolve_model(args.model, args.ppocr_source)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    inference = _create_inference_from_args(args, model)
 
     try:
         await inference.start()
 
-        task = create_task(args.pipeline, inference)
+        task = create_task(model, inference)
 
-        server_name = f"PaddleOCR {args.pipeline} MCP server"
+        server_name = f"PaddleOCR {model} MCP server"
         mcp = FastMCP(
             name=server_name,
             mask_error_details=True,

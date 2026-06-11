@@ -1,3 +1,17 @@
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from __future__ import annotations
 
 import logging
@@ -8,6 +22,7 @@ from typing import Any
 
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
+from paddleocr import Model, PaddleOCRClient, PaddleOCRVLOptions
 from pydantic import SecretStr
 
 logger = logging.getLogger(__name__)
@@ -15,6 +30,19 @@ logger = logging.getLogger(__name__)
 _DEFAULT_BASE_URL = "https://paddleocr.aistudio-app.com"
 
 _PAGES_DELIMITER = "\n\f"
+
+
+def _resolve_vl_model(model: str | Model) -> Model:
+    if isinstance(model, Model):
+        resolved = model
+    else:
+        try:
+            resolved = Model(model)
+        except ValueError as exc:
+            msg = f"Unsupported model: {model!r}"
+            raise ValueError(msg) from exc
+
+    return resolved
 
 
 class PaddleOCRVLLoader(BaseLoader):
@@ -26,11 +54,13 @@ class PaddleOCRVLLoader(BaseLoader):
         *,
         access_token: SecretStr | None = None,
         base_url: str | None = None,
+        model: str | Model | None = None,
         use_doc_orientation_classify: bool | None = False,
         use_doc_unwarping: bool | None = False,
         use_layout_detection: bool | None = None,
         use_chart_recognition: bool | None = None,
         use_seal_recognition: bool | None = None,
+        use_ocr_for_image_block: bool | None = None,
         layout_threshold: float | dict[int, float] | None = None,
         layout_nms: bool | None = None,
         layout_unclip_ratio: (
@@ -39,19 +69,25 @@ class PaddleOCRVLLoader(BaseLoader):
         layout_merge_bboxes_mode: str | dict[str, float] | None = None,
         layout_shape_mode: str | None = None,
         prompt_label: str | None = None,
+        format_block_content: bool | None = None,
         repetition_penalty: float | None = None,
         temperature: float | None = None,
         top_p: float | None = None,
         min_pixels: int | None = None,
         max_pixels: int | None = None,
         max_new_tokens: int | None = None,
+        vlm_extra_args: dict[str, Any] | None = None,
         merge_layout_blocks: bool | None = None,
+        markdown_ignore_labels: list[str] | None = None,
         prettify_markdown: bool | None = None,
         show_formula_number: bool | None = None,
         restructure_pages: bool | None = None,
         merge_tables: bool | None = None,
         relevel_titles: bool | None = None,
+        return_markdown_images: bool | None = None,
+        output_formats: list[str] | None = None,
         visualize: bool | None = None,
+        extra_options: dict[str, Any] | None = None,
         timeout: int = 300,
     ) -> None:
         """Initialize the PaddleOCR-VL loader.
@@ -62,32 +98,40 @@ class PaddleOCRVLLoader(BaseLoader):
             access_token: Optional access token as ``SecretStr``. If ``None``, the value
                 from the ``PADDLEOCR_ACCESS_TOKEN`` environment variable will be used.
             base_url: Base URL of the PaddleOCR API service. Defaults to the official
-                service. Most users do not need to set this.
+                service.
+            model: PaddleOCR-VL model name or ``Model`` enum value.
             use_doc_orientation_classify: Whether to enable document orientation
                 classification.
             use_doc_unwarping: Whether to enable document unwarping.
             use_layout_detection: Whether to enable layout detection.
             use_chart_recognition: Whether to enable chart recognition.
             use_seal_recognition: Whether to enable seal recognition.
+            use_ocr_for_image_block: Whether to use OCR for image layout blocks.
             layout_threshold: Layout detection threshold.
             layout_nms: Whether to apply non-maximum suppression for layout detection.
             layout_unclip_ratio: Layout unclip ratio.
             layout_merge_bboxes_mode: Mode for merging layout bounding boxes.
             layout_shape_mode: Layout shape mode.
             prompt_label: Prompt label for the VLM.
+            format_block_content: Whether to save formatted Markdown in JSON.
             repetition_penalty: Repetition penalty for VLM sampling.
             temperature: Temperature for VLM sampling.
             top_p: Top-p sampling value for VLM.
             min_pixels: Minimum number of pixels allowed in preprocessing.
             max_pixels: Maximum number of pixels allowed in preprocessing.
             max_new_tokens: Maximum number of tokens generated by the VLM.
+            vlm_extra_args: Additional VLM arguments passed through to the service.
             merge_layout_blocks: Whether to merge layout blocks across columns.
+            markdown_ignore_labels: Layout labels to ignore in Markdown.
             prettify_markdown: Whether to prettify the Markdown output.
             show_formula_number: Whether to include formula numbers in Markdown.
             restructure_pages: Whether to restructure results across pages.
             merge_tables: Whether to merge tables across pages.
             relevel_titles: Whether to relevel titles.
+            return_markdown_images: Whether to return images referenced by Markdown.
+            output_formats: Additional export formats such as ``docx``.
             visualize: Whether to include visualization results.
+            extra_options: Additional service options passed through as-is.
             timeout: Poll timeout in seconds.
         """
         self._file_paths = (
@@ -105,7 +149,7 @@ class PaddleOCRVLLoader(BaseLoader):
         self._base_url = base_url or _DEFAULT_BASE_URL
         self._timeout = timeout
 
-        from paddleocr import PaddleOCRVLOptions
+        self._model = _resolve_vl_model(model) if model is not None else None
 
         options_kwargs: dict[str, Any] = {
             key: val
@@ -115,25 +159,32 @@ class PaddleOCRVLLoader(BaseLoader):
                 "use_layout_detection": use_layout_detection,
                 "use_chart_recognition": use_chart_recognition,
                 "use_seal_recognition": use_seal_recognition,
+                "use_ocr_for_image_block": use_ocr_for_image_block,
                 "layout_threshold": layout_threshold,
                 "layout_nms": layout_nms,
                 "layout_unclip_ratio": layout_unclip_ratio,
                 "layout_merge_bboxes_mode": layout_merge_bboxes_mode,
                 "layout_shape_mode": layout_shape_mode,
                 "prompt_label": prompt_label,
+                "format_block_content": format_block_content,
                 "repetition_penalty": repetition_penalty,
                 "temperature": temperature,
                 "top_p": top_p,
                 "min_pixels": min_pixels,
                 "max_pixels": max_pixels,
                 "max_new_tokens": max_new_tokens,
+                "vlm_extra_args": vlm_extra_args,
                 "merge_layout_blocks": merge_layout_blocks,
+                "markdown_ignore_labels": markdown_ignore_labels,
                 "prettify_markdown": prettify_markdown,
                 "show_formula_number": show_formula_number,
                 "restructure_pages": restructure_pages,
                 "merge_tables": merge_tables,
                 "relevel_titles": relevel_titles,
+                "return_markdown_images": return_markdown_images,
+                "output_formats": output_formats,
                 "visualize": visualize,
+                "extra_options": extra_options,
             }.items()
             if val is not None
         }
@@ -146,19 +197,17 @@ class PaddleOCRVLLoader(BaseLoader):
 
     def _process_file(self, file_path: str) -> tuple[str, dict[str, Any]]:
         """Process a single file through the SDK and return text + raw result."""
-        from paddleocr import PaddleOCRClient
-
         with PaddleOCRClient(
             token=self._token,
             base_url=self._base_url,
             client_platform="langchain",
             poll_timeout=self._timeout,
         ) as client:
+            parse_kwargs: dict[str, Any] = {"options": self._options}
+            if self._model is not None:
+                parse_kwargs["model"] = self._model
             if self._is_url(file_path):
-                result = client.parse_document(
-                    file_url=file_path,
-                    options=self._options,
-                )
+                result = client.parse_document(file_url=file_path, **parse_kwargs)
             else:
                 local_path = Path(file_path)
                 if not local_path.exists():
@@ -166,7 +215,7 @@ class PaddleOCRVLLoader(BaseLoader):
                     raise ValueError(msg)
                 result = client.parse_document(
                     file_path=str(local_path),
-                    options=self._options,
+                    **parse_kwargs,
                 )
 
         text_parts = [page.markdown_text for page in result.pages if page.markdown_text]
@@ -174,11 +223,17 @@ class PaddleOCRVLLoader(BaseLoader):
 
         raw_response = {
             "job_id": result.job_id,
+            "data_info": result.data_info,
             "pages": [
                 {
                     "markdown_text": page.markdown_text,
                     "markdown_images": page.markdown_images,
                     "output_images": page.output_images,
+                    "pruned_result": page.pruned_result,
+                    "input_image_url": page.input_image_url,
+                    "exports": page.exports,
+                    "markdown": page.markdown,
+                    "raw": page.raw,
                 }
                 for page in result.pages
             ],
@@ -203,5 +258,7 @@ class PaddleOCRVLLoader(BaseLoader):
                 "source": str(file_path),
                 "paddleocr_vl_raw_response": raw_response,
             }
+            if self._model is not None:
+                metadata["model"] = self._model.value
 
             yield Document(page_content=text, metadata=metadata)

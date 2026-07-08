@@ -46,6 +46,14 @@ import numpy as np
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
+@app.errorhandler(413)
+def too_large(e):
+    return jsonify({'error': '文件大小超过限制 (最大 16MB)'}), 413
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({'error': '服务器内部错误，请重试'}), 500
+
 # ========================================================================
 # 4. PP-OCRv6 模型配置
 # ========================================================================
@@ -177,10 +185,17 @@ function handleFile(file) {
 }
 
 function uploadImage(file) {
- const formData = new FormData();
- formData.append('file', file);
- fetch('/ocr', { method: 'POST', body: formData })
- .then(r => r.json())
+  const formData = new FormData();
+  formData.append('file', file);
+  fetch('/ocr', { method: 'POST', body: formData })
+  .then(r => {
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('application/json')) {
+      return r.text().then(t => { throw new Error(t.substring(0, 200)); });
+    }
+    if (!r.ok) return r.json().then(d => { throw new Error(d.error || '服务器错误 (' + r.status + ')'); });
+    return r.json();
+  })
  .then(data => {
  loading.style.display = 'none';
  if (data.error) { showError(data.error); return; }

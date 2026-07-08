@@ -13,6 +13,7 @@ PaddleOCR v6 Web Service (CPU Optimized)
 import os
 import sys
 import io
+import time
 import argparse
 
 # ========================================================================
@@ -295,7 +296,15 @@ if __name__ == '__main__':
     else:
         try:
             from waitress import serve
-            serve(app, host='0.0.0.0', port=args.port, threads=OMP_THREADS)
+            while True:
+                try:
+                    serve(app, host='0.0.0.0', port=args.port,
+                          threads=OMP_THREADS,
+                          channel_timeout=600,
+                          connection_limit=10)
+                except Exception as _e:
+                    print(f"[ERROR] Waitress crashed: {_e}, restarting in 3s...")
+                    time.sleep(3)
         except ImportError:
             print("[ERROR] Waitress 未安装，请执行: pip install waitress")
             sys.exit(1)
